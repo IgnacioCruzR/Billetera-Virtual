@@ -34,10 +34,12 @@ La rama `workspace-integration` de Billetera-Virtual reúne Compose, ejemplos y 
 
 Cada etiqueta `workspace-vX.Y.Z` fija el ZIP, su checksum y los seis SHAs de `workspace.lock.json`. Las versiones posteriores deben fijar commits publicados y reflejar los cambios de contratos en las notas de la versión. Las fuentes de contratos aprobados se alojan bajo `contracts/`. [Contratos](../contracts/README.md) · [Guía de descarga y clonación](LOCAL_DEVELOPMENT.md#obtener-los-recursos-compartidos)
 
+`workspace-v1.0.1` es la versión estable y fija los commits de `main` verificados después de fusionar los seis PR. La versión preliminar `workspace-v1.0.0` conserva los commits usados durante la revisión. [Versión estable](https://github.com/IgnacioCruzR/Billetera-Virtual/releases/tag/workspace-v1.0.1) · [Versión preliminar](https://github.com/IgnacioCruzR/Billetera-Virtual/releases/tag/workspace-v1.0.0)
+
 Para preparar el ZIP desde el checkout de coordinación, crea una etiqueta sobre el commit revisado y genera el ZIP con la lista de recursos:
 
 ```powershell
-$version = 'workspace-v1.0.0'
+$version = 'workspace-v1.0.1'
 $asset = "billetera-recursos-$version.zip"
 git archive --format=zip --output=$asset $version -- .env.example .gitattributes .gitignore compose.yaml README.md ARCHITECTURE.md TECH_STACK.md docs scripts contracts workspace.lock.json
 if ($LASTEXITCODE -ne 0) { throw 'No se pudo exportar la versión' }

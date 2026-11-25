@@ -4,16 +4,21 @@ Necesitas Git, PowerShell y Docker Desktop con el motor de contenedores Linux y 
 
 ## Obtener los recursos compartidos
 
-Desde la carpeta contenedora de tu nuevo workspace, descarga el ZIP de una etiqueta de coordinación y comprueba su SHA-256. El paquete contiene `workspace.lock.json` con los repositorios y commits compatibles. La primera versión reproduce las ramas de revisión de la consolidación. [Versiones de coordinación](https://github.com/IgnacioCruzR/Billetera-Virtual/releases)
+Desde la carpeta donde crearás `Billetera-Workspace`, descarga el ZIP de la versión estable y su archivo SHA-256. El manifiesto `workspace.lock.json` fija los seis commits de `main` verificados por GitHub Actions tras la consolidación. [Descarga de workspace-v1.0.1](https://github.com/IgnacioCruzR/Billetera-Virtual/releases/tag/workspace-v1.0.1)
 
 ```powershell
-$version = 'workspace-v1.0.0'
+$version = 'workspace-v1.0.1'
 $asset = "billetera-recursos-$version.zip"
 $download = "https://github.com/IgnacioCruzR/Billetera-Virtual/releases/download/$version"
 $zip = Join-Path (Get-Location).Path $asset
 $checksum = "$zip.sha256"
 Invoke-WebRequest -UseBasicParsing -Uri "$download/$asset" -OutFile $zip -ErrorAction Stop
 Invoke-WebRequest -UseBasicParsing -Uri "$download/$asset.sha256" -OutFile $checksum -ErrorAction Stop
+```
+
+En la misma sesión, verifica el SHA-256 y extrae los recursos en una carpeta nueva.
+
+```powershell
 $expected = (Get-Content -Raw -LiteralPath $checksum).Trim()
 if ($expected -notmatch '^[a-fA-F0-9]{64}$' -or
     (Get-FileHash -Algorithm SHA256 -LiteralPath $zip).Hash -ne $expected) {
@@ -28,7 +33,7 @@ Si ya tienes un workspace, extrae el ZIP en una carpeta temporal y revisa los ca
 
 ## Clonar las aplicaciones
 
-Desde el workspace recién extraído, clona las seis aplicaciones en las rutas de Compose y selecciona los commits del manifiesto. La comprobación usa cada SHA exacto. Para comenzar un cambio, consulta la sección de ramas después de verificar la versión.
+Desde el workspace recién extraído, clona las seis aplicaciones en las rutas de Compose. Git deja cada clon en el commit exacto de la versión. Después de verificar el entorno, vuelve a `main`, actualízala con `git pull --ff-only` y crea tu rama de trabajo. [Ramas y pull requests](#ramas-y-pull-requests)
 
 ```powershell
 $lock = Get-Content -Raw -LiteralPath workspace.lock.json | ConvertFrom-Json

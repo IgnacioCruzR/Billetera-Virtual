@@ -1,35 +1,35 @@
 {
-    "version":  "workspace-v1.0.0",
+    "version":  "workspace-v1.0.1",
     "applications":  [
                          {
                              "path":  "frontend",
                              "repository":  "https://github.com/Error4144/billetera-frontend.git",
-                             "commit":  "a3e7671479d8afe134eda2e13e6d12b02b4f0c3d"
+                             "commit":  "4beed50b630eee08c90018a1f880e8489c637552"
                          },
                          {
                              "path":  "bff-graphql",
                              "repository":  "https://github.com/Error4144/billetera-bff-graphql.git",
-                             "commit":  "326e68b6953f11384851bddf288e8b5908e63a4f"
+                             "commit":  "acf01c185d0b7ee32d118c4b6f8dd8cdec9bbb03"
                          },
                          {
                              "path":  "ms-usuarios",
                              "repository":  "https://github.com/Error4144/billetera-ms-usuarios.git",
-                             "commit":  "64f5be552d93742c4d094a41ea8e3d3f444a9f4f"
+                             "commit":  "e22455f82f18a729d46f2b181d99d49c39a211fa"
                          },
                          {
                              "path":  "ms-transacciones",
                              "repository":  "https://github.com/Error4144/billetera-ms-transacciones.git",
-                             "commit":  "991ae3b6c5b753bf7149c945ada1efe65ec43732"
+                             "commit":  "c27390da16d309b0a516f7c606d0e50013a9a7cb"
                          },
                          {
                              "path":  "ms-notificaciones",
                              "repository":  "https://github.com/Error4144/billetera-ms-notificaciones.git",
-                             "commit":  "7a8de88dc38d3ba8723a85037eb7689a677c964a"
+                             "commit":  "f19373db2c5c4a3988be4609d93189d4956dd040"
                          },
                          {
                              "path":  "ms-agente-mcp",
                              "repository":  "https://github.com/Error4144/billetera-ms-agente-mcp.git",
-                             "commit":  "c2d54d13450167aa849b1046e95ecc78e1c9de14"
+                             "commit":  "c856161d6e04e655488604801bfac6898d1ba588"
                          }
                      ]
 }
