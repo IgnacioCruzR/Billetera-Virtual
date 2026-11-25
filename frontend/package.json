@@ -7,11 +7,13 @@
     "dev": "vite",
     "build": "tsc --noEmit && vite build",
     "typecheck": "tsc --noEmit",
+    "lint": "eslint . --max-warnings 0",
     "preview": "vite preview",
     "test": "npm run test:unit && npm run test:e2e",
     "test:unit": "node --experimental-strip-types --test \"tests/*.unit.ts\"",
     "test:e2e": "playwright test",
-    "test:coverage": "node --experimental-strip-types --experimental-test-coverage --test-coverage-lines=60 --test-coverage-include=\"src/**\" --test \"tests/*.unit.ts\""
+    "test:coverage": "node --experimental-strip-types --experimental-test-coverage --test-coverage-lines=60 --test-coverage-include=\"src/**\" --test \"tests/*.unit.ts\"",
+    "test:coverage:statements": "node scripts/statement-coverage.mjs"
   },
   "engines": {
     "node": ">=22.12.0"
@@ -34,14 +36,19 @@
     "tailwind-merge": "^3.4.0"
   },
   "devDependencies": {
+    "@eslint/js": "9.39.5",
     "@playwright/test": "^1.56.1",
     "@tailwindcss/vite": "^4.1.17",
     "@types/node": "^22.19.0",
     "@types/react": "^19.2.5",
     "@types/react-dom": "^19.2.3",
     "@vitejs/plugin-react": "^6.0.1",
+    "eslint": "9.39.5",
+    "eslint-plugin-react-hooks": "7.0.1",
+    "istanbul-lib-instrument": "5.2.1",
     "tailwindcss": "^4.1.17",
     "typescript": "~5.9.3",
+    "typescript-eslint": "8.49.0",
     "vite": "^8.1.0"
   }
 }

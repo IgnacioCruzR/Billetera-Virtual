@@ -136,11 +136,13 @@ flowchart LR
 
 Los puertos internos de los servicios, las imágenes, el controlador Ingress, el almacenamiento, los probes de backend y las políticas de red se definen cuando exista un entorno de despliegue. El diagrama describe recursos futuros. [Ingress en Kubernetes](https://kubernetes.io/docs/concepts/services-networking/ingress/) · [StatefulSets y almacenamiento](https://kubernetes.io/docs/concepts/workloads/controllers/statefulset/)
 
+El entorno local define los puertos de desarrollo y redes aisladas de PostgreSQL y Kafka. Publica únicamente Nginx por loopback. Los cinco esqueletos están preparados para configurar las conexiones aprobadas en esta topología. [Compose, puertos y redes locales](LOCAL_DEVELOPMENT.md#puertos-y-redes)
+
 ## Matriz de cumplimiento
 
 | Origen | Destino | Protocolo o sentido | Estado observado |
 | --- | --- | --- | --- |
-| `frontend` | `bff-graphql` | GraphQL | Apollo Client declarado. La demo usa memoria. Integración pendiente. |
+| `frontend` | `bff-graphql` | GraphQL | Apollo Client preparado en modo de integración con `/graphql`. Esquema, sesión y operaciones remotas pendientes. La demo usa memoria. |
 | `bff-graphql` | `ms-usuarios` | gRPC | Diseño. Implementación y contrato pendientes. |
 | `bff-graphql` | `ms-transacciones` | gRPC | Diseño. Implementación y contrato pendientes. |
 | `bff-graphql` | `ms-notificaciones` | gRPC | Diseño. Implementación y contrato pendientes. |
@@ -153,7 +155,7 @@ Los puertos internos de los servicios, las imágenes, el controlador Ingress, el
 | `ms-transacciones` | Kafka | Publicación | Diseño y catálogo. Productor pendiente. |
 | Kafka | `ms-transacciones` | Consumo | Diseño. Consumidor y suscripciones pendientes. |
 | Kafka | `ms-notificaciones` | Consumo | Diseño y catálogo. Consumidor pendiente. |
-| Usuarios, Transacciones y Notificaciones | PostgreSQL de cada propietario | Acceso local del servicio | Separación documentada. Bases y migraciones pendientes. |
+| Usuarios, Transacciones y Notificaciones | PostgreSQL de cada propietario | Acceso local del servicio | Instancias separadas en Compose. Conexión de los servicios y migraciones pendientes. |
 | Navegador | Servicios internos, Kafka, bases y LLM | Acceso directo fuera de la topología | Sin conexiones observadas. Aislamiento de red del despliegue pendiente. |
 | `ms-notificaciones` | Servicios de dominio | Llamadas directas fuera de la topología | Diagrama corregido. Las observaciones de vigencia quedan pendientes por Kafka. |
 | Ingress | Frontend y BFF | HTTP interno mediante Services | Rutas documentadas. Ingress y clúster pendientes. |

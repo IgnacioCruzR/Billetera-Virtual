@@ -2,7 +2,6 @@ import { useMemo, useState } from 'react'
 import { Copy, Eye, EyeOff, Plus, Target } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import type { useFinancialRecords } from '@/features/accounts/account-data'
-import { today } from '@/features/dashboard/mock-data'
 import { budgetBounds, budgetHistory, budgetPhase, parseBudgetPeriod, summarizeBudgets } from './budget-calculations'
 import type { BudgetPeriod } from './budget-model'
 import { BudgetCard, type BudgetActionHandler } from './budget-cards'
@@ -12,8 +11,8 @@ import { BudgetDetailDrawer, BudgetForm, DeleteBudgetDialog, DuplicateBudgetDial
 import { BudgetAlerts, BudgetPace, BudgetRecommendations, BudgetSummaryCards, UnbudgetedExpenses } from './budget-overview'
 
 type Modal = { type: 'create'; category?: string } | { type: 'copy-all' } | { type: 'detail' | 'edit' | 'duplicate' | 'delete'; id: string }
-export function BudgetsPage({ defaultWarning, finance, detected, hidden, onTogglePrivacy, onHistory, onToast, query, onClearInitial }: {
-  defaultWarning: number;
+export function BudgetsPage({ defaultWarning, finance, detected, today, hidden, onTogglePrivacy, onHistory, onToast, query, onClearInitial }: {
+  defaultWarning: number; today: string;
   finance: ReturnType<typeof useFinancialRecords>; detected: ReadonlySet<string>; hidden: boolean; onTogglePrivacy: () => void;
   onHistory: (category: string, from: string, to: string) => void; onToast: (message: string) => void;
   query?: string; onClearInitial: () => void;

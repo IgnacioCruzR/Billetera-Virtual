@@ -99,12 +99,14 @@ function rememberAccounts(ids: ReadonlySet<string>, item: MovementDraft) {
   return next
 }
 
-export function createMockFinancialRepository(): FinancialRepository {
-  let records: FinancialRecords = {
+export function createMockFinancialRepository({ initialRecords, userId = demoProfile.id }: {
+  initialRecords?: FinancialRecords; userId?: string;
+} = {}): FinancialRepository {
+  let records: FinancialRecords = structuredClone(initialRecords ?? {
     ...emptyRecords, accounts, movements: seedMovements, budgets: seedBudgets, commitments: seedCommitments, savingsGoals: seedSavingsGoals, reservations: seedReservations,
     categories: seedCategories, usedCategoryIds: new Set(seedMovements.flatMap(item => item.type === 'transferencia' ? [] : [item.categoryId])),
     usedAccountIds: seedMovements.reduce((ids, item) => rememberAccounts(ids, item), new Set<string>()),
-  }
+  })
 
   function findAccount(id: string) {
     const account = records.accounts.find(item => item.id === id)
@@ -226,12 +228,12 @@ export function createMockFinancialRepository(): FinancialRepository {
       const form = { ...draft, name: draft.name.trim(), notes: draft.notes.trim() }
       const commitment: FinancialCommitment = existing
         ? { ...existing, ...form, status: 'pendiente', originalDueDate: existing.originalDueDate ?? (existing.dueDate === draft.dueDate ? undefined : existing.dueDate) }
-        : { ...form, id: crypto.randomUUID(), status: 'pendiente', userId: demoProfile.id, currency: 'CLP', createdAt: new Date().toISOString() }
+        : { ...form, id: crypto.randomUUID(), status: 'pendiente', userId, currency: 'CLP', createdAt: new Date().toISOString() }
       return { ...current, commitments: id ? current.commitments.map(item => item.id === id ? commitment : item) : [commitment, ...current.commitments] }
     }),
     confirmCommitment: (id, draft) => update(current => confirmCommitment(current, id, draft, today, new Date().toISOString(), () => crypto.randomUUID())),
     cancelCommitment: id => update(current => cancelCommitment(current, id, today, new Date().toISOString())),
-    saveGoal: (draft, id, initial) => update(current => saveSavingsGoal(current, draft, savingsContext(), demoProfile.id, id, initial)),
+    saveGoal: (draft, id, initial) => update(current => saveSavingsGoal(current, draft, savingsContext(), userId, id, initial)),
     recordReservation: (type, draft) => update(current => recordReservation(current, type, draft, savingsContext())),
     changeGoalStatus: (id, action) => update(current => changeGoalStatus(current, id, action, savingsContext())),
   }

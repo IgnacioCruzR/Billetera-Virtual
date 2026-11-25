@@ -1,0 +1,30 @@
+{
+  "name": "billetera-bff-graphql",
+  "version": "0.1.0",
+  "private": true,
+  "engines": { "node": ">=22.12.0" },
+  "scripts": {
+    "build": "tsc",
+    "typecheck": "tsc --noEmit",
+    "check:config": "node --env-file=.env dist/main.js"
+  },
+  "dependencies": {
+    "@apollo/server": "5.5.2",
+    "@as-integrations/express5": "1.1.2",
+    "@grpc/grpc-js": "1.14.7",
+    "@grpc/proto-loader": "0.8.1",
+    "@nestjs/apollo": "14.2.1",
+    "@nestjs/common": "12.6.1",
+    "@nestjs/core": "12.6.1",
+    "@nestjs/graphql": "14.2.1",
+    "@nestjs/microservices": "12.6.1",
+    "@nestjs/platform-express": "12.6.1",
+    "graphql": "16.15.0",
+    "reflect-metadata": "0.2.2",
+    "rxjs": "7.8.2"
+  },
+  "devDependencies": {
+    "@types/node": "22.19.0",
+    "typescript": "5.9.3"
+  }
+}

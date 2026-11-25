@@ -1,0 +1,16 @@
+spring:
+  application:
+    name: ms-notificaciones
+  main:
+    web-application-type: none
+  kafka:
+    bootstrap-servers: ${KAFKA_BROKERS:kafka:9092}
+
+billetera:
+  grpc-port: ${GRPC_PORT:50053}
+  postgres:
+    host: ${POSTGRES_HOST:postgres-notificaciones}
+    port: ${POSTGRES_PORT:5432}
+    database: ${POSTGRES_DB:billetera_notificaciones}
+    user: ${POSTGRES_USER:}
+    password: ${POSTGRES_PASSWORD:}

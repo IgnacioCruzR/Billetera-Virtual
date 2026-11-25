@@ -12,7 +12,7 @@ import { BudgetPanel, CommitmentsPanel, DashboardSavingsPanel, FinancialHealthPa
 import { useDashboard } from './use-dashboard'
 import { isIsoDate } from '@/features/movements/movement-data'
 import { AccountsPage } from '@/features/accounts/accounts-page'
-import { createMockFinancialRepository, useFinancialRecords } from '@/features/accounts/account-data'
+import { useFinancialRecords } from '@/features/accounts/account-data'
 import { DeleteTransactionDialog, TransactionDetailDrawer } from '@/features/movements/transaction-dialogs'
 import type { TransactionActionHandler } from '@/features/movements/transaction-history'
 import { TransactionsPage } from '@/features/movements/transactions-page'
@@ -24,10 +24,9 @@ import { MicroExpensesPage } from '@/features/micro-expenses/micro-expenses-page
 import type { DateRange } from '@/features/micro-expenses/micro-expense-model'
 import type { SavingsScenario } from '@/features/savings/savings-model'
 import { SavingsGoalsPage } from '@/features/savings/savings-goals-page'
-import { createMockHealthRepository, loadHealth } from '@/features/health/health-data'
+import { loadHealth } from '@/features/health/health-data'
 import { healthPeriods, type FinancialHealthPeriod } from '@/features/health/health-model'
 import type { AnalysisContext } from '@/features/assistant/assistant-model'
-import { createDemoAnalysisProvider } from '@/features/assistant/assistant-provider'
 import { useAssistantSession } from '@/features/assistant/use-assistant-session'
 import { DashboardAnalysis } from '@/features/assistant/assistant-dashboard-panel'
 
@@ -36,7 +35,7 @@ import { filterCategories, readCategories } from '@/features/categories/category
 import { useSettingsSession } from '@/features/settings/use-settings-session'
 import type { SecuritySettings } from '@/features/settings/preferences-model'
 import { ConfirmationDialog } from '@/features/settings/settings-confirmation'
-import { demoNotifications } from './demo-notifications'
+import type { DashboardSources } from '@/app/demo-sources'
 
 const FinancialAssistantPage = lazy(() => import('@/features/assistant/financial-assistant-page'))
 const FinancialHealthPage = lazy(() => import('@/features/health/financial-health-page'))
@@ -44,6 +43,11 @@ const SettingsPage = lazy(() => import('@/features/settings/settings-page'))
 
 function isApplicationPage(item: string): item is ApplicationPage {
   return Object.hasOwn(pageTitles, item)
+}
+
+function routeFromLocation({ hash, pathname, search }: Location) {
+  const page = pathname.slice(1)
+  return hash.slice(1) || (isApplicationPage(page) ? page + search : '')
 }
 
 function historyFilters(query?: string): Partial<TransactionFilters> {
@@ -65,14 +69,14 @@ function formatPeriod(period: Period, asOf: string) {
   return `${first} – ${date}`
 }
 
-export function Dashboard({ session, onLogout }: { session: SecuritySettings; onLogout: () => void }) {
-  const settings = useSettingsSession()
+export function Dashboard({ session, sources, onLogout }: { session: SecuritySettings; sources: DashboardSources; onLogout: () => void }) {
+  const settings = useSettingsSession(sources.settings, sources.settingsSnapshot)
   const { preferences } = settings
   const { regional, financial, appearance, detection: criteria } = preferences
   const [period, setPeriod] = useState<Period>(regional.dashboardPeriod)
   const [asOf, setAsOf] = useState(refreshFinancialDate)
   const [hidden, setHidden] = useState(preferences.privacy.hideOnStart)
-  const [hash, setHash] = useState(() => window.location.hash.slice(1))
+  const [hash, setHash] = useState(() => routeFromLocation(window.location))
   const [editor, setEditor] = useState<{ record: Movement | null; preset?: MovementPreset } | null>(null)
   const [operation, setOperation] = useState<{ item: Movement; type: 'detail' | 'delete' } | null>(null)
   const [dirty, setDirty] = useState(false)
@@ -82,24 +86,24 @@ export function Dashboard({ session, onLogout }: { session: SecuritySettings; on
   const [healthPeriod, setHealthPeriod] = useState<FinancialHealthPeriod>(financial.analysisPeriod)
   const [savingsScenarios, setSavingsScenarios] = useState<SavingsScenario[]>([])
   const lastFocus = useRef<HTMLElement | null>(null)
-  const [repository] = useState(createMockFinancialRepository)
-  const finance = useFinancialRecords(repository)
+  const finance = useFinancialRecords(sources.financial)
   const { records, status, saveMovement: save, removeMovement: remove, reload } = finance
   const catalog = readCategories(records)
   const analysisContext = useMemo<AnalysisContext>(() => ({
     records, criteria, today: asOf, timeZone: regional.timeZone, categories: filterCategories(catalog, 'gasto'), scenarios: savingsScenarios, defaults: financial,
   }), [records, catalog, criteria, asOf, regional.timeZone, savingsScenarios, financial])
-  const analysisVersion = useMemo(() => Symbol(), [analysisContext])
-  const analysisProvider = useMemo(() => createDemoAnalysisProvider(analysisContext, status === 'ready'), [analysisContext, status])
+  const { provider: analysisProvider, version: analysisVersion } = useMemo(() => ({
+    provider: sources.analysis(analysisContext, status === 'ready'), version: Symbol(),
+  }), [sources, analysisContext, status])
   const assistant = useAssistantSession(analysisProvider, analysisVersion, preferences.assistant.enabled)
   const latestAnalysis = assistant.history[0]
   const { movements, accounts } = records
   const detected = useMemo(() => detectMicroExpenses(movements, criteria, asOf).candidateIds, [movements, criteria, asOf])
   const snapshot = useDashboard(period, records, detected, asOf, financial.horizon)
-  const healthRepository = useMemo(() => createMockHealthRepository(records, asOf, criteria, regional.timeZone), [records, asOf, criteria, regional.timeZone])
+  const healthRepository = useMemo(() => sources.health(records, asOf, criteria, regional.timeZone), [sources, records, asOf, criteria, regional.timeZone])
   const currentHealth = useMemo(() => loadHealth(healthRepository, 'month', status), [healthRepository, status])
   const health = useMemo(() => healthPeriod === 'month' ? currentHealth : loadHealth(healthRepository, healthPeriod, status), [currentHealth, healthRepository, healthPeriod, status])
-  const alerts = demoNotifications(records, snapshot, currentHealth, asOf, regional.timeZone, settings.notifications)
+  const alerts = sources.notifications(records, snapshot, currentHealth, asOf, regional.timeZone, settings.notifications)
   const [route, query] = hash.split('?', 2)
   const page: ApplicationPage = isApplicationPage(route) ? route : 'dashboard'
   const heading = { dashboard: 'dashboard-title', movimientos: 'movements-title', cuentas: 'accounts-title', presupuestos: 'budgets-title', compromisos: 'commitments-title', hormiga: 'micro-expenses-title', metas: 'savings-title', salud: 'financial-health-title', asistente: 'assistant-title', configuracion: 'settings-title' }[page]
@@ -120,6 +124,8 @@ export function Dashboard({ session, onLogout }: { session: SecuritySettings; on
   }, [regional.timeZone])
 
   useEffect(() => {
+    const { location, history } = window
+    if (!location.hash && hash) history.replaceState(history.state, '', `/#${hash}`)
     const sync = () => {
       const next = window.location.hash.slice(1)
       if (dirty && page === 'configuracion' && next !== hash) {
@@ -236,7 +242,7 @@ export function Dashboard({ session, onLogout }: { session: SecuritySettings; on
       <div className="min-w-0 lg:ml-[var(--sidebar-width)]">
         <Header active={page} onNavigate={navigate} period={period} onPeriod={setPeriod} onRegister={() => openRegister()} page={page} ready={canRegister} alerts={alerts} profile={settings.profile} hidden={hidden} />
         {page === 'cuentas' && <AccountsPage finance={finance} detected={detected} hidden={hidden} initialAccountId={params.get('cuenta') ?? undefined} onClearInitial={() => clearDetail('cuentas')} onTogglePrivacy={togglePrivacy} onMovement={openRegister} onHistory={id => { window.location.hash = `movimientos?cuenta=${encodeURIComponent(id)}` }} onToast={setAnnouncement} />}
-        {page === 'presupuestos' && <BudgetsPage defaultWarning={financial.budgetWarning} finance={finance} detected={detected} hidden={hidden} query={query} onClearInitial={() => clearDetail('presupuestos')} onTogglePrivacy={togglePrivacy} onHistory={(category, from, to) => { window.location.hash = `movimientos?${new URLSearchParams({ categoria: category, desde: from, hasta: to, tipo: 'gasto' })}` }} onToast={setAnnouncement} />}
+        {page === 'presupuestos' && <BudgetsPage defaultWarning={financial.budgetWarning} finance={finance} detected={detected} today={asOf} hidden={hidden} query={query} onClearInitial={() => clearDetail('presupuestos')} onTogglePrivacy={togglePrivacy} onHistory={(category, from, to) => { window.location.hash = `movimientos?${new URLSearchParams({ categoria: category, desde: from, hasta: to, tipo: 'gasto' })}` }} onToast={setAnnouncement} />}
         {page === 'compromisos' && <CommitmentsPage defaultHorizon={financial.horizon} minimumFree={financial.minimumFree} finance={finance} today={asOf} hidden={hidden} initialId={params.get('compromiso')} onClearInitial={() => clearDetail('compromisos')} onTogglePrivacy={togglePrivacy} onMovement={id => { lastFocus.current = null; window.location.hash = `movimientos?movimiento=${encodeURIComponent(id)}` }} onToast={setAnnouncement} />}
         {page === 'hormiga' && <MicroExpensesPage key={query} finance={finance} detected={detected} today={asOf} criteria={criteria} onCriteria={value => settings.updatePreference('detection', value)} hidden={hidden} onTogglePrivacy={togglePrivacy} query={query} onMovement={id => { lastFocus.current = null; window.location.hash = `movimientos?movimiento=${encodeURIComponent(id)}` }} onToast={setAnnouncement} onUseSavings={carrySavingsScenario} />}
         {page === 'metas' && <SavingsGoalsPage key={query} finance={finance} today={asOf} hidden={hidden} onTogglePrivacy={togglePrivacy} scenarios={savingsScenarios} query={query} onToast={setAnnouncement} onMovement={openRegister} />}

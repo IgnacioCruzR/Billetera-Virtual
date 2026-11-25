@@ -10,12 +10,14 @@ El prompt correctivo fija repositorios, tecnologías, flujos e infraestructura. 
 
 | Componente | Estado observado |
 | --- | --- |
-| Repositorios | Un checkout Git local con `frontend/` como subdirectorio del proyecto. Los otros cinco componentes objetivo carecen de código en el workspace revisado. |
-| Frontend | Aplicación React y TypeScript con Vite, Tailwind CSS, primitivas shadcn/ui, Lucide React y Recharts. Apollo Client está declarado como dependencia. La entrada React monta el dashboard y el repositorio en memoria alimenta las pantallas. |
+| Repositorios | Un checkout Git local con seis raíces de aplicación. La extracción independiente conserva el historial por componente y se hará con autorización. |
+| Frontend | Aplicación React y TypeScript con Vite, Tailwind CSS, primitivas shadcn/ui, Lucide React y Recharts. La demo usa un repositorio en memoria y el modo de integración inicializa Apollo Client para `/graphql`. |
 | Funcionalidades | Dashboard, Movimientos, Mis cuentas, Presupuestos, Cobros y pagos, Gastos hormiga, Metas de ahorro, Salud financiera, Asistente IA y Configuración. La aplicación comparte registros financieros y preferencias a través de adaptadores locales de sesión. |
-| Backend y contratos | Faltan servidores y clientes de los cinco servicios, esquemas GraphQL efectivos, archivos Protobuf, persistencia implementada y clientes de Kafka. |
+| Backend y contratos | Cinco esqueletos con configuración por entorno. Quedan pendientes los contratos GraphQL y Protobuf, persistencia de dominio y productores y consumidores definitivos. |
 | Conectividad del navegador | La revisión de la capa de datos, el punto de entrada y la configuración de Vite encontró un flujo local en memoria. Apollo queda listo para integrar cuando exista el endpoint público del BFF. |
-| Entrega | Se añadieron empaquetado Docker/Nginx y CI para el frontend. Las plantillas de CI para servicios se conservan en el workspace para su incorporación futura. Kubectl está instalado y carece de contexto configurado. El daemon Docker no respondió localmente. |
+| Entrega | Compose local con tres PostgreSQL, un broker Kafka KRaft y perfil Nginx. Se conservan CI del frontend y las plantillas de servicios. El contexto local verificado de Docker Desktop es `desktop-linux`. Kubernetes sigue documentado como diseño objetivo. |
+
+[Entorno local](docs/LOCAL_DEVELOPMENT.md) · [Repositorios y CI](docs/REPOSITORY_STRUCTURE.md)
 
 ## Inconsistencias y correcciones
 
@@ -52,7 +54,7 @@ flowchart TB
 
 Los grupos del contexto financiero se implementarán como módulos internos de NestJS en un solo servicio. Cada microservicio con persistencia tendrá su PostgreSQL y sus credenciales. Los identificadores entre contextos son referencias de contrato. El BFF fija la identidad de la solicitud y la propaga a los servicios autorizados. El agente consulta únicamente por gRPC, limita los datos enviados al proveedor HTTPS y basa sus explicaciones en los indicadores calculados por el propietario.
 
-## Verificación del checkout
+## Verificación de la etapa correctiva
 
 | Comprobación | Resultado |
 | --- | --- |

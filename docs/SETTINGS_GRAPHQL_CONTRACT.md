@@ -1,6 +1,6 @@
 # Contratos GraphQL candidatos para Configuración
 
-El navegador usa Apollo Client como futuro punto de integración y el BFF como única entrada pública. Los nombres siguientes son candidatos. Los adaptadores demo `SettingsRepository` y `FinancialRepository` devuelven modelos de pantalla asíncronos. El BFF traducirá las operaciones aprobadas a gRPC y validará la identidad desde la sesión.
+El modo `integration` inicializa Apollo Client con `/graphql` del mismo origen. Las operaciones de la tabla son candidatas y se habilitarán al aprobar el esquema y la sesión del BFF. Los adaptadores demo `SettingsRepository` y `FinancialRepository` devuelven modelos de pantalla asíncronos. El BFF traducirá las operaciones aprobadas a gRPC y validará la identidad desde la sesión. [Tipos, autorización y estado de todo el inventario](GRAPHQL_INTEGRATION_PLAN.md)
 
 | Operación | Destino | Entrada y respuesta propuestas |
 | --- | --- | --- |

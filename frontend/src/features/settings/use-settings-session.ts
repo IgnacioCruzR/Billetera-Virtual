@@ -1,17 +1,18 @@
 import { useEffect, useRef, useState } from 'react'
 import { setRegionalFormats } from '@/lib/utils'
-import { defaultNotifications, defaultPreferences, type UserPreferences } from './preferences-model'
-import { createSettingsRepository, demoProfile, mergePreference, readVisualPreferences } from './settings-data'
+import type { NotificationPreferences, UserPreferences, UserProfile } from './preferences-model'
+import { mergePreference, type SettingsRepository } from './settings-data'
 
-function deviceStorage() {
-  try { return window.localStorage } catch { return undefined }
+export interface SettingsSnapshot {
+  profile: UserProfile
+  preferences: UserPreferences
+  notifications: NotificationPreferences
 }
 
-export function useSettingsSession() {
-  const [repository] = useState(() => createSettingsRepository(deviceStorage()))
-  const [profile, setProfile] = useState(demoProfile)
-  const [preferences, setPreferences] = useState(() => ({ ...defaultPreferences, ...readVisualPreferences(deviceStorage()) }))
-  const [notifications, setNotifications] = useState(defaultNotifications)
+export function useSettingsSession(repository: SettingsRepository, initial: SettingsSnapshot) {
+  const [profile, setProfile] = useState(initial.profile)
+  const [preferences, setPreferences] = useState(initial.preferences)
+  const [notifications, setNotifications] = useState(initial.notifications)
   const [status, setStatus] = useState<'loading' | 'ready' | 'error'>('loading')
   const [attempt, setAttempt] = useState(0)
   const mounted = useRef(false)

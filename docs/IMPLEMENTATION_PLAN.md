@@ -1,6 +1,6 @@
 # Plan de implementación
 
-El objetivo es construir seis repositorios independientes con entregas verificables. El workspace actual es el punto de partida de frontend y documentación. El diseño objetivo se rige por [Arquitectura](../ARCHITECTURE.md) y [Topología](TOPOLOGY.md).
+El objetivo es construir seis repositorios independientes con entregas verificables. El workspace local reúne el frontend, cinco esqueletos y Compose para desarrollo. El diseño objetivo se rige por [Arquitectura](../ARCHITECTURE.md) y [Topología](TOPOLOGY.md). [Entorno local](LOCAL_DEVELOPMENT.md) · [Plan de separación](REPOSITORY_STRUCTURE.md)
 
 | Etapa | Entrega | Aceptación |
 | --- | --- | --- |
@@ -24,7 +24,7 @@ El objetivo es construir seis repositorios independientes con entregas verificab
 
 El [workflow del frontend](../.github/workflows/frontend-ci.yml) corresponde a la estructura actual, que mantiene el código en `frontend/`. Si el componente se extrae a un checkout con su código en la raíz, ajustar los filtros de ruta, el directorio de ejecución y la ruta del lockfile. En Ubuntu, la verificación compila TypeScript y Vite, ejecuta Playwright Chromium y construye y prueba el contenedor Nginx. La cobertura unitaria mínima aplica a los módulos de `src/` cargados por las pruebas Node. Incorporar medición de componentes al ampliar esa suite.
 
-Las siguientes plantillas se incorporan como `.github/workflows/ci.yml` en cada repositorio de servicio cuando exista su base de código.
+Las plantillas se incorporarán como `.github/workflows/ci.yml` en cada repositorio cuando existan las pruebas de aplicación, las herramientas de análisis y el Dockerfile requeridos. Los esqueletos se comprueban desde su raíz con los comandos de compilación documentados. [CI por repositorio](REPOSITORY_STRUCTURE.md#ci-por-repositorio)
 
 | Repositorio | Plantilla | Prerrequisitos |
 | --- | --- | --- |
@@ -32,7 +32,7 @@ Las siguientes plantillas se incorporan como `.github/workflows/ci.yml` en cada 
 | `ms-transacciones` | [TypeScript](ci/typescript-service.yml) | Los mismos scripts. Incluir pruebas de dominio, persistencia y contratos gRPC al implementarlos. |
 | `ms-agente-mcp` | [TypeScript](ci/typescript-service.yml) | Los mismos scripts. Usar dobles del LLM para verificar herramientas y autorización en CI. |
 | `ms-usuarios` | [Go](ci/ms-usuarios.yml) | `go.mod`, `go.sum`, pruebas y Dockerfile. El perfil incluye los paquetes de aplicación y valida por sentencias. |
-| `ms-notificaciones` | [Java](ci/ms-notificaciones.yml) | `pom.xml` con Checkstyle, JUnit y JaCoCo. La plantilla propone Java 21 y Maven con reporte `target/site/jacoco/jacoco.xml`; confirmar runtime y plugins al crear el servicio. |
+| `ms-notificaciones` | [Java](ci/ms-notificaciones.yml) | `pom.xml` con Java 17 y Maven. Incorporar Checkstyle y JUnit junto con el reporte JaCoCo `target/site/jacoco/jacoco.xml` al implementar la aplicación. |
 
 Los scripts de cobertura TypeScript deben fallar por debajo del 60 % de líneas y cubrir el código de aplicación. Preservar un umbral equivalente en Go y Java con sus métricas nativas. Construir las imágenes después de las verificaciones. La publicación y el despliegue son etapas separadas.
 

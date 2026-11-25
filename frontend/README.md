@@ -18,7 +18,11 @@ Abre la URL que imprime Vite. `npm run build` comprueba TypeScript y genera `dis
 
 Las pantallas comparten los registros de demostración en memoria. Al recargar se restablecen los datos iniciales. Las alertas presupuestarias se calculan desde los límites y gastos registrados, y las reservas se derivan de los aportes y liberaciones.
 
+`VITE_DATA_MODE=demo` selecciona la demostración y es el valor predeterminado. Con `VITE_DATA_MODE=integration`, la entrada inicializa Apollo Client con `/graphql` del mismo origen y muestra el estado pendiente del BFF. La configuración es pública y Vite la incorpora durante la compilación. Para cambiar el modo de la imagen, vuelve a construirla con `--build-arg VITE_DATA_MODE=integration`. [Plan de integración](../docs/GRAPHQL_INTEGRATION_PLAN.md)
+
 ## Contenedor Nginx
+
+El [entorno local de Compose](../docs/LOCAL_DEVELOPMENT.md) puede arrancar este contenedor de forma independiente en modo demo. La guía incluye la verificación de las diez rutas contra el paquete servido por Nginx.
 
 Desde la raíz del checkout, con un daemon Docker disponible, construye y sirve la misma demo.
 
@@ -127,14 +131,15 @@ npm test
 
 Puedes ejecutar las mismas pruebas con un Edge instalado usando `PLAYWRIGHT_CHANNEL=msedge`. [Navegadores compatibles con Playwright](https://playwright.dev/docs/browsers)
 
-`npm run test:unit` ejecuta las pruebas unitarias de presupuestos, flujo de caja, gastos hormiga y metas de ahorro con Node.js.
+`npm run test:unit` ejecuta las pruebas unitarias con Node.js. `npm run lint` comprueba TypeScript, JavaScript y las reglas de Hooks de React. `npm run typecheck` comprueba los tipos y `npm run test:e2e` ejecuta la suite de navegador.
 
-`npm run test:coverage` exige al menos 60 % de cobertura de líneas sobre módulos de `src/` cargados por esa suite. `npm run typecheck` ejecuta el análisis estático de TypeScript y `npm run test:e2e` ejecuta la suite de navegador. [Workflow de CI](../.github/workflows/frontend-ci.yml)
+`npm run test:coverage` exige al menos 60 % de cobertura de líneas sobre los módulos de `src/` cargados por esa suite. `npm run test:coverage:statements` vuelve a ejecutar la suite con contadores de Istanbul sobre esos mismos archivos para medir sentencias. [Auditoría de alcance](../docs/FRONTEND_AUDIT.md#cobertura) · [Workflow de CI](../.github/workflows/frontend-ci.yml)
 
 ## Estructura
 
 | Ruta | Responsabilidad |
 | --- | --- |
+| `src/app/` | Selección de modo, composición de proveedores de demo y transporte Apollo para el BFF. |
 | `src/features/dashboard/dashboard.tsx` | Composición del dashboard y controles compartidos. |
 | `src/features/dashboard/` | Navegación, tarjetas, gráficos, vistas y formulario de registro. |
 | `src/features/dashboard/mock-data.ts` | Cuentas, categorías, movimientos, presupuestos, compromisos y datos de análisis de ejemplo. |
@@ -178,7 +183,7 @@ La [metodología](../docs/FINANCIAL_INDICATORS.md#metodología-v2-demo-de-salud-
 
 **Configuración** administra las preferencias compartidas, categorías, avisos, privacidad, consentimiento y exportación CSV. Los límites y las opciones de verificación están en la [guía de Configuración](../docs/USER_SETTINGS.md) y los [contratos candidatos](../docs/SETTINGS_GRAPHQL_CONTRACT.md).
 
-El punto de integración es `FinancialRepository`, que consume `useFinancialRecords`. Cuando exista el esquema de `bff-graphql`, Apollo Client y `ApolloProvider` se conectarán a consultas y mutaciones tipadas por `/graphql`. `ms-transacciones` es el responsable previsto de saldos, series históricas, la autorización sobre los recursos financieros, la idempotencia y la ejecución atómica de cada transferencia. Los importes CLP se mapearán sin pérdida de precisión. El historial y el período de análisis conservarán su independencia al pasar a consultas del servidor. [Topología oficial](../docs/TOPOLOGY.md) · [Documentación de Apollo Client](https://www.apollographql.com/docs/react/get-started)
+El punto de integración es `FinancialRepository`, que consume `useFinancialRecords`. `ApolloProvider` ya se inicializa en `integration`. Al aprobar el esquema, el adaptador tipado usará el cliente para las operaciones de `/graphql`. `ms-transacciones` es el responsable previsto de saldos, series históricas, autorización sobre los recursos financieros, idempotencia y atomicidad de transferencias. El contrato conserva importes CLP exactos y filtros independientes de los períodos del resumen. [Topología oficial](../docs/TOPOLOGY.md) · [Plan de GraphQL](../docs/GRAPHQL_INTEGRATION_PLAN.md)
 
 En **Asistente IA**, el adaptador `AssistantProvider` permite integrar la futura operación `generateFinancialAnalysis` con Apollo Client. La demo conserva en memoria el consentimiento y los informes de sesión. Consulta los [pasos para probar los seis análisis](../docs/AI_ASSISTANT.md) y la [propuesta de contrato](../docs/AI_ANALYSIS_CONTRACT.md).
 

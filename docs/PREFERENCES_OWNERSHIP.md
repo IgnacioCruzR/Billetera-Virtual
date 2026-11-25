@@ -13,7 +13,9 @@
 | Presentación y visualización inicial | Navegador en la demo | Una futura sincronización multidispositivo deberá definir precedencia en Usuarios. |
 | Exportaciones | Servicios propietarios de cada conjunto, coordinados por el BFF | Transacciones provee conjuntos financieros autorizados. Identidad controla la sesión. |
 
-La capa local conserva repositorios por sesión y comparte la vista guardada con todas las pantallas. Categorías financieras pertenecen a los registros compartidos; las reglas de la bandeja y las preferencias generales tienen operaciones distintas. El historial del asistente sigue siendo temporal.
+`createDemoSources` construye los repositorios para cada sesión y las pantallas consumen la misma vista de preferencias guardadas. Las categorías pertenecen al libro financiero. El almacenamiento del dispositivo conserva únicamente la presentación y la opción de ocultar montos al iniciar. Perfil, criterios, reglas, consentimiento de demo e historial IA se mantienen en memoria. La futura sincronización por usuario debe definir precedencia frente a los valores del dispositivo.
+
+El modo `integration` inicializa Apollo con `/graphql`. Al aprobar el esquema, el BFF compondrá las lecturas de preferencias globales y reglas específicas y dirigirá cada escritura al propietario de la tabla. [Inventario de operaciones y adaptadores](GRAPHQL_INTEGRATION_PLAN.md)
 
 ## Propagación futura mediante Kafka
 
