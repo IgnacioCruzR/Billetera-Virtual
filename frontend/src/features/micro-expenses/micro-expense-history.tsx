@@ -1,11 +1,11 @@
+import { useCategoryCatalog } from '@/features/categories/category-context'
 import { useRef, useState } from 'react'
 import { Ellipsis, ListChecks, Search } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Dialog, DialogContent, DialogDescription, DialogTitle } from '@/components/ui/dialog'
-import { Field, Input, Select } from '@/components/ui/field'
+import { Field, Input, MoneyInput, Select } from '@/components/ui/field'
 import { Popover, PopoverClose, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
 import { useDialogSubmission } from '@/components/ui/use-dialog-submission'
-import { expenseCategories } from '@/features/dashboard/mock-data'
 import type { Account } from '@/features/dashboard/model'
 import { accountLabel, categoryLabel, emptyFilters, filterErrors } from '@/features/movements/history'
 import { MicroExpenseBadge, TransactionAmount, TransactionPagination, transactionDescription } from '@/features/movements/transaction-history'
@@ -42,6 +42,7 @@ export function MicroHistory({ history, patterns, accounts, hidden, filters, onF
   history: MicroExpenseHistory[]; patterns: SpendingPattern[]; accounts: Account[]; hidden: boolean; filters: MicroExpenseFilters;
   onFilters: (filters: MicroExpenseFilters) => void; onMovement: (id: string) => void; onClassify: (request: ClassificationRequest) => void;
 }) {
+  const catalog = useCategoryCatalog()
   const [page, setPage] = useState(1)
   const [selected, setSelected] = useState<ReadonlySet<string>>(new Set())
   const errors = filterErrors({ ...emptyFilters, ...filters })
@@ -67,7 +68,7 @@ export function MicroHistory({ history, patterns, accounts, hidden, filters, onF
       <div className="flex flex-wrap items-center justify-between gap-3"><div><h2 id="micro-history-title" tabIndex={-1} className="scroll-mt-24 text-lg font-bold tracking-tight">Historial de gastos</h2><p className="mt-0.5 text-xs text-muted-foreground">Consulta y clasifica los gastos efectivos del período.</p></div><Button variant="outline" size="sm" onClick={() => { setPage(1); setSelected(new Set()); onFilters(initialMicroFilters) }}>Limpiar filtros</Button></div>
       <div className="grid gap-2.5 min-[460px]:grid-cols-2 lg:grid-cols-4">
         <div className="relative min-[460px]:col-span-2"><Search className="pointer-events-none absolute top-3 left-3 size-4 text-muted-foreground" aria-hidden="true" /><Input type="search" aria-label="Buscar gastos" placeholder="Buscar por descripción" value={filters.search} onChange={event => patch({ search: event.target.value })} className="pl-9" /></div>
-        <Select aria-label="Categoría de gasto" value={filters.category} onChange={event => patch({ category: event.target.value })}><option value="">Todas las categorías</option>{expenseCategories.map(item => <option value={item.id} key={item.id}>{item.name}</option>)}</Select>
+        <Select aria-label="Categoría de gasto" value={filters.category} onChange={event => patch({ category: event.target.value })}><option value="">Todas las categorías</option>{catalog.filter(item => item.type === 'gasto').map(item => <option value={item.id} key={item.id}>{item.name}</option>)}</Select>
         <Select aria-label="Cuenta de gasto" value={filters.account} onChange={event => patch({ account: event.target.value })}><option value="">Todas las cuentas</option>{accounts.map(item => <option value={item.id} key={item.id}>{item.name}</option>)}</Select>
         <Select aria-label="Clasificación del gasto" value={filters.classification} onChange={event => patch({ classification: event.target.value as MicroExpenseFilters['classification'] })}><option value="">Todas las clasificaciones</option>{Object.entries(classificationLabels).map(([id, label]) => <option key={id} value={id}>{label}</option>)}</Select>
         <Select aria-label="Patrón de consumo" value={filters.patternId} onChange={event => patch({ patternId: event.target.value })}><option value="">Todos los patrones</option>{patterns.map(item => <option key={item.id} value={item.id}>{item.name}</option>)}{filters.patternId && !patterns.some(item => item.id === filters.patternId) && <option value={filters.patternId}>Patrón sin gastos incluidos</option>}</Select>
@@ -76,8 +77,8 @@ export function MicroHistory({ history, patterns, accounts, hidden, filters, onF
       <div className="grid gap-2.5 min-[460px]:grid-cols-2 lg:grid-cols-4">
         <Field label="Fecha desde">{id => <Input id={id} type="date" value={filters.from} onChange={event => patch({ from: event.target.value })} />}</Field>
         <Field label="Fecha hasta" error={errors.dates}>{(id, attrs) => <Input id={id} type="date" value={filters.to} onChange={event => patch({ to: event.target.value })} {...attrs} />}</Field>
-        <Field label="Monto mínimo (CLP)">{id => <Input id={id} inputMode="numeric" value={filters.minimum} onChange={event => patch({ minimum: event.target.value })} />}</Field>
-        <Field label="Monto máximo (CLP)" error={errors.amounts}>{(id, attrs) => <Input id={id} inputMode="numeric" value={filters.maximum} onChange={event => patch({ maximum: event.target.value })} {...attrs} />}</Field>
+        <Field label="Monto mínimo (CLP)">{id => <MoneyInput hidden={hidden} id={id} inputMode="numeric" value={filters.minimum} onChange={event => patch({ minimum: event.target.value })} />}</Field>
+        <Field label="Monto máximo (CLP)" error={errors.amounts}>{(id, attrs) => <MoneyInput hidden={hidden} id={id} inputMode="numeric" value={filters.maximum} onChange={event => patch({ maximum: event.target.value })} {...attrs} />}</Field>
       </div>
       <div className="flex flex-wrap items-center justify-between gap-2 border-t border-border pt-3">
         <p className="text-xs text-muted-foreground" aria-live="polite">{filtered.length} {filtered.length === 1 ? 'resultado' : 'resultados'} · {selection.length} {selection.length === 1 ? 'seleccionado' : 'seleccionados'}</p>
@@ -94,7 +95,7 @@ export function MicroHistory({ history, patterns, accounts, hidden, filters, onF
           </tr></thead>
           <tbody className="divide-y divide-border">{visible.map(entry => <tr key={entry.movement.id} className="hover:bg-secondary/45">
             <td className="p-2 pl-4">{checkbox(entry)}</td><th scope="row" className="p-2">{entryButton(entry)}</th>
-            <td className="p-2 text-muted-foreground">{categoryLabel(entry.movement)}</td><td className="p-2 text-muted-foreground">{accountLabel(accounts, entry.movement.accountId)}</td>
+            <td className="p-2 text-muted-foreground">{categoryLabel(entry.movement, catalog)}</td><td className="p-2 text-muted-foreground">{accountLabel(accounts, entry.movement.accountId)}</td>
             <td className="p-2"><time dateTime={entry.movement.date}>{shortDate(entry.movement.date)}</time></td><td className="p-2"><TransactionAmount item={entry.movement} hidden={hidden} /></td>
             <td className="p-2"><MicroExpenseBadge status={entry.status} /></td><td className="p-2 text-xs text-muted-foreground capitalize">{entry.source}</td><td className="p-2">{entryActions(entry)}</td>
           </tr>)}</tbody>
@@ -102,7 +103,7 @@ export function MicroHistory({ history, patterns, accounts, hidden, filters, onF
       </div>
       <ul className="grid gap-2 px-3 pb-3 min-[1060px]:hidden" aria-label="Tarjetas de gastos identificados">{visible.map(entry => <li key={entry.movement.id} className="min-w-0 rounded-xl border border-border bg-secondary/55 p-3">
         <div className="flex items-center gap-2">{checkbox(entry)}<div className="min-w-0 flex-1">{entryButton(entry)}</div>{entryActions(entry)}</div>
-        <div className="mt-1 text-xs text-muted-foreground">{categoryLabel(entry.movement)} · {accountLabel(accounts, entry.movement.accountId)} · <time dateTime={entry.movement.date}>{shortDate(entry.movement.date)}</time></div>
+        <div className="mt-1 text-xs text-muted-foreground">{categoryLabel(entry.movement, catalog)} · {accountLabel(accounts, entry.movement.accountId)} · <time dateTime={entry.movement.date}>{shortDate(entry.movement.date)}</time></div>
         <div className="mt-2 flex flex-wrap items-center justify-between gap-2"><MicroExpenseBadge status={entry.status} /><TransactionAmount item={entry.movement} hidden={hidden} /></div>
         <div className="mt-1 text-xs text-muted-foreground capitalize">{entry.source}</div>
       </li>)}</ul>

@@ -1,0 +1,57 @@
+name: Frontend CI
+
+on:
+  pull_request:
+    paths:
+      - frontend/**
+      - .github/workflows/frontend-ci.yml
+  push:
+    paths:
+      - frontend/**
+      - .github/workflows/frontend-ci.yml
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    defaults:
+      run:
+        working-directory: frontend
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v6
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+      - run: npm ci
+      - name: Análisis estático de TypeScript
+        run: npm run typecheck
+      - run: npm run build
+      - name: Pruebas unitarias y cobertura mínima
+        run: npm run test:coverage
+      - run: npx playwright install --with-deps chromium
+      - run: npm run test:e2e
+      - name: Construir imagen del frontend
+        run: docker build --tag billetera-frontend:ci .
+      - name: Verificar Nginx e imagen
+        run: |
+          container=$(docker run --detach --publish 127.0.0.1::8080 billetera-frontend:ci)
+          trap 'docker rm --force "$container"' EXIT
+          address=$(docker port "$container" 8080/tcp)
+          base="http://$address"
+          curl --fail --silent --show-error --retry 8 --retry-connrefused "$base/healthz"
+          index=$(curl --fail --silent --show-error "$base/")
+          asset=$(sed -nE 's/.*src="(\/assets\/[^"]+\.js)".*/\1/p' <<< "$index")
+          test -n "$asset"
+          curl --fail --silent --show-error --output /dev/null "$base$asset"
+          fallback=$(curl --fail --silent --show-error "$base/movimientos")
+          test "$index" = "$fallback"
+          test "$(curl --silent --output /dev/null --write-out '%{http_code}' "$base/assets/missing.js")" = 404
+          test "$(curl --silent --output /dev/null --write-out '%{http_code}' "$base/graphql")" = 404

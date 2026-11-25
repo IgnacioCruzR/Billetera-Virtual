@@ -1,4 +1,6 @@
-import { expenseCategories, incomeCategories, monthAt, shiftDays, today } from '@/features/dashboard/mock-data'
+import { today } from '@/features/dashboard/mock-data'
+import { dashboardPeriod, dashboardPeriodEndDates } from '@/features/dashboard/financial-period'
+import { filterCategories, readCategories } from '@/features/categories/category-model'
 import { movementCapacity, worsensReservation } from '@/features/savings/savings-ledger'
 import { reservedFundsError } from '@/features/savings/savings-records'
 import type { FinancialRecords, Movement, MovementDraft, Period } from '@/features/dashboard/model'
@@ -8,7 +10,6 @@ export { isIsoDate }
 export { classificationOf } from '@/features/micro-expenses/micro-expense-detection'
 
 export const maximumMovementAmount = 999_999_999_999
-export const categories = [...expenseCategories, ...incomeCategories]
 
 type Field = 'amount' | 'account' | 'destination' | 'category' | 'date'
 
@@ -25,7 +26,8 @@ export function validateMovement(draft: MovementDraft, records: FinancialRecords
   if (draft.type === 'transferencia') {
     if (!destination || destination.id === account?.id) errors.destination = 'Selecciona una cuenta activa distinta del origen.'
   } else {
-    const available = draft.type === 'gasto' ? expenseCategories : incomeCategories
+    const existing = records.movements.find(item => item.id === editingId)
+    const available = filterCategories(readCategories(records), draft.type, true, existing?.type === draft.type ? existing.categoryId : undefined)
     if (!available.some(item => item.id === draft.categoryId)) errors.category = 'Selecciona una categoría compatible.'
   }
   if (!isIsoDate(draft.date)) errors.date = 'Ingresa una fecha válida.'
@@ -51,19 +53,9 @@ export function validateMovement(draft: MovementDraft, records: FinancialRecords
   return errors
 }
 
-export function getPeriodEndDates(period: Period) {
-  const { from } = getPeriodRange(period)
-  const count = period === 'month' ? Number(today.slice(8)) : period === 'quarter' ? 3 : Number(today.slice(5, 7))
-  return Array.from({ length: count }, (_, index) => {
-    if (period === 'month') return shiftDays(from, index)
-    return index === count - 1 ? today : shiftDays(`${monthAt(index - count + 2)}-01`, -1)
-  })
-}
+export const getPeriodEndDates = (period: Period, cutoff = today) => dashboardPeriodEndDates(period, cutoff)
 
-export function getPeriodRange(period: Period) {
-  const month = period === 'quarter' ? monthAt(-2) : period === 'year' ? `${today.slice(0, 4)}-01` : monthAt(0)
-  return { from: `${month}-01`, to: today }
-}
+export const getPeriodRange = (period: Period, cutoff = today) => dashboardPeriod(period, cutoff).current
 
 export function totals(movements: Movement[]) {
   let income = 0

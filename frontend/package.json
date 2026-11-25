@@ -8,8 +8,10 @@
     "build": "tsc --noEmit && vite build",
     "typecheck": "tsc --noEmit",
     "preview": "vite preview",
-    "test": "npm run test:unit && playwright test",
-    "test:unit": "node --experimental-strip-types --test tests/budget-calculations.unit.ts tests/cash-flow.unit.ts tests/micro-expenses.unit.ts tests/savings.unit.ts"
+    "test": "npm run test:unit && npm run test:e2e",
+    "test:unit": "node --experimental-strip-types --test \"tests/*.unit.ts\"",
+    "test:e2e": "playwright test",
+    "test:coverage": "node --experimental-strip-types --experimental-test-coverage --test-coverage-lines=60 --test-coverage-include=\"src/**\" --test \"tests/*.unit.ts\""
   },
   "engines": {
     "node": ">=22.12.0"

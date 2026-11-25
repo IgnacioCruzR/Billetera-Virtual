@@ -1,8 +1,9 @@
+import { useCategories, useCategoryName } from '@/features/categories/category-context'
 import { useState, type FormEvent } from 'react'
 import { LoaderCircle, TriangleAlert } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Dialog, DialogContent, DialogDescription, DialogTitle } from '@/components/ui/dialog'
-import { Field, Input, Select } from '@/components/ui/field'
+import { Field, Input, MoneyInput, Select } from '@/components/ui/field'
 import { useDialogSubmission } from '@/components/ui/use-dialog-submission'
 import type { Account, FinancialRecords } from '@/features/dashboard/model'
 import { accountLabel } from '@/features/movements/history'
@@ -10,7 +11,7 @@ import { maximumMovementAmount } from '@/features/movements/movement-data'
 import { daysBetween } from '@/lib/calendar'
 import { cn, formatMoney } from '@/lib/utils'
 import type { CommitmentConfirmation, CommitmentFormData, CommitmentType, FinancialCommitment } from './commitment-model'
-import { categoriesForCommitment, CommitmentAmount, commitmentCategoryLabel, CommitmentIcon, CommitmentStatusBadge, commitmentTypeLabel, commitmentTypes, longDate, type CommitmentAction } from './commitment-list'
+import { CommitmentAmount, CommitmentIcon, CommitmentStatusBadge, commitmentTypeLabel, commitmentTypes, longDate, type CommitmentAction } from './commitment-list'
 import { confirmationError, validateCommitment } from './commitment-records'
 
 type CloseProps = { onClose: () => void; onCloseAutoFocus: (event: Event) => void }
@@ -36,7 +37,7 @@ export function CommitmentForm({ editing, dueDate, accounts, today, hidden, onSa
   const [date, setDate] = useState(editing?.dueDate ?? dueDate ?? today)
   const [notes, setNotes] = useState(editing?.notes ?? '')
   const [errors, setErrors] = useState<ReturnType<typeof validateCommitment>>({})
-  const categories = categoriesForCommitment(type)
+  const categories = useCategories(type === 'cobro' ? 'ingreso' : 'gasto', true, editing?.categoryId)
   const liveAccounts = accounts.filter(item => item.status === 'activa')
   const parsedAmount = /^\d+$/.test(amount) ? Number(amount) : NaN
 
@@ -57,7 +58,7 @@ export function CommitmentForm({ editing, dueDate, accounts, today, hidden, onSa
           <div className="grid grid-cols-2 gap-1 rounded-lg border border-border bg-secondary p-1" role="group" aria-label="Tipo de compromiso">{commitmentTypes.map(item => <Button key={item.id} variant={item.id === type ? 'muted' : 'ghost'} aria-pressed={item.id === type} disabled={Boolean(editing) && item.id !== type} onClick={() => { if (item.id !== type) { setType(item.id); setCategory(''); setErrors({}) } }}>{item.label}</Button>)}</div>
           <Field label={type === 'pago' ? 'Nombre del pago' : 'Nombre del cobro'} error={errors.name}>{(id, attrs) => <Input id={id} value={name} maxLength={120} onChange={event => setName(event.target.value)} required {...attrs} />}</Field>
           <div className="grid gap-3 sm:grid-cols-2">
-            <Field label="Monto (CLP)" error={errors.amount}>{(id, attrs) => <Input id={id} value={amount} inputMode="numeric" maxLength={12} onChange={event => setAmount(event.target.value)} placeholder="Ej. 65000" required {...attrs} />}</Field>
+            <Field label="Monto (CLP)" error={errors.amount}>{(id, attrs) => <MoneyInput hidden={hidden} id={id} value={amount} inputMode="numeric" maxLength={12} onChange={event => setAmount(event.target.value)} placeholder="Ej. 65000" required {...attrs} />}</Field>
             <Field label={type === 'pago' ? 'Fecha de vencimiento' : 'Fecha prevista de recepción'} error={errors.dueDate}>{(id, attrs) => <Input id={id} type="date" value={date} onChange={event => setDate(event.target.value)} required {...attrs} />}</Field>
             <Field label={type === 'pago' ? 'Cuenta de origen' : 'Cuenta de destino'} error={errors.accountId}>{(id, attrs) => <Select id={id} value={accountId} onChange={event => setAccount(event.target.value)} required {...attrs}><option value="">Selecciona una cuenta</option>{liveAccounts.map(item => <option key={item.id} value={item.id}>{item.name}</option>)}</Select>}</Field>
             <Field label="Categoría" error={errors.categoryId}>{(id, attrs) => <Select id={id} value={categoryId} onChange={event => setCategory(event.target.value)} required {...attrs}><option value="">Selecciona una categoría</option>{categories.map(item => <option key={item.id} value={item.id}>{item.name}</option>)}</Select>}</Field>
@@ -125,10 +126,11 @@ export function CancelCommitmentDialog({ item, onCancel, onClose, onCloseAutoFoc
 export function CommitmentDetailDrawer({ item, accounts, today, hidden, onMove, onAction, onClose, onCloseAutoFocus }: CloseProps & {
   item: FinancialCommitment; accounts: Account[]; today: string; hidden: boolean; onMove: (id: string) => void; onAction: (action: CommitmentAction) => void;
 }) {
+  const categoryName = useCategoryName()
   const days = daysBetween(today, item.dueDate)
   const items = [
     { label: 'Tipo', value: commitmentTypeLabel(item.type) }, { label: 'Cuenta asociada', value: accountLabel(accounts, item.accountId) },
-    { label: 'Categoría', value: commitmentCategoryLabel(item) }, { label: 'Fecha de vencimiento', value: longDate(item.dueDate) },
+    { label: 'Categoría', value: categoryName(item.categoryId) }, { label: 'Fecha de vencimiento', value: longDate(item.dueDate) },
     ...(item.originalDueDate ? [{ label: 'Vencimiento original', value: longDate(item.originalDueDate) }] : []),
     ...(item.status === 'pendiente' ? [{ label: 'Plazo', value: days === 0 ? 'Vence hoy' : days < 0 ? `${-days} ${days === -1 ? 'día' : 'días'} de atraso` : `${days} ${days === 1 ? 'día restante' : 'días restantes'}` }]
       : item.status === 'confirmado' ? [{ label: 'Fecha efectiva', value: longDate(item.effectiveDate) }] : [{ label: 'Fecha de cancelación', value: longDate(item.cancelledOn) }]),

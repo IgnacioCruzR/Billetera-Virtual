@@ -1,13 +1,20 @@
-import type { Account, Category, Movement } from './model'
+import { seedCategories } from '@/features/categories/category-model'
+import { defaultPreferences } from '@/features/settings/preferences-model'
+import { demoProfile } from '@/features/settings/settings-data'
+import type { Account, Movement } from './model'
 import { accountEffect } from '@/features/accounts/account-balances'
 import { DEFAULT_WARNING_THRESHOLD, parseBudgetPeriod } from '@/features/budgets/budget-calculations'
 import { dateInZone, shiftDays } from '@/lib/calendar'
 import type { FinancialCommitment } from '@/features/commitments/commitment-model'
 import type { SavingsGoal, SavingsReservationOperation } from '@/features/savings/savings-model'
 
-export const user = { id: 'camila-demo', name: 'Camila Rojas', initials: 'CR', timeZone: 'America/Santiago' }
-export let today = dateInZone(new Date(), user.timeZone)
-export function refreshFinancialDate() { today = dateInZone(new Date(), user.timeZone); return today }
+let financialTimeZone = defaultPreferences.regional.timeZone
+export let today = dateInZone(new Date(), financialTimeZone)
+export function refreshFinancialDate(timeZone = financialTimeZone) {
+  financialTimeZone = timeZone
+  today = dateInZone(new Date(), financialTimeZone)
+  return today
+}
 export { shiftDays }
 
 export function monthAt(offset: number) {
@@ -22,20 +29,7 @@ const accountSamples = [
   { id: 'ahorro', name: 'Cuenta de ahorro', description: 'Ahorro personal', type: 'ahorro', color: '#818CF8', balance: 300_000, openedOn: `${monthAt(-16)}-01` },
 ] as const
 
-export const expenseCategories: Category[] = [
-  { id: 'alimentacion', name: 'Alimentación', color: '#10B981' },
-  { id: 'transporte', name: 'Transporte', color: '#60A5FA' },
-  { id: 'vivienda', name: 'Vivienda', color: '#818CF8' },
-  { id: 'salud', name: 'Salud', color: '#2DD4BF' },
-  { id: 'entretenimiento', name: 'Entretenimiento', color: '#F59E0B' },
-  { id: 'otros', name: 'Otros', color: '#64748B' },
-]
-
-export const incomeCategories = [
-  { id: 'sueldo', name: 'Sueldo' },
-  { id: 'freelance', name: 'Trabajo independiente' },
-  { id: 'otros-ingresos', name: 'Otros ingresos' },
-]
+const expenseCategories = seedCategories.filter(item => item.type === 'gasto')
 
 const currentExpenseAmounts = [314_400, 147_000, 420_000, 118_000, 131_000, 104_000]
 const pastExpenses = [1_402_727, 1_498_000, 1_589_000, 1_430_000, 1_474_000, 1_505_000]
@@ -75,7 +69,7 @@ const upcoming = [
 ] as const
 
 export const seedCommitments: FinancialCommitment[] = upcoming.map(({ daysUntil, ...item }) => ({
-  ...item, dueDate: shiftDays(today, daysUntil), status: 'pendiente', notes: '', currency: 'CLP', userId: user.id,
+  ...item, dueDate: shiftDays(today, daysUntil), status: 'pendiente', notes: '', currency: 'CLP', userId: demoProfile.id,
   createdAt: `${today}T12:00:00Z`,
 }))
 
@@ -127,15 +121,8 @@ export const accounts: Account[] = accountSamples.map(({ balance, ...sample }) =
   initialBalance: balance - seedMovements.reduce((sum, item) => sum + accountEffect(item, sample.id), 0),
 }))
 
-export const healthPreview = {
-  score: 82,
-  label: 'Saludable',
-  description: 'Tus ingresos cubrieron tus gastos. Reducir los gastos hormiga puede mejorar tu capacidad de ahorro.',
-  month: monthAt(-1),
-}
-
 const goalsCreatedOn = `${monthAt(-3)}-01`
-const seedGoal = { userId: user.id, currency: 'CLP', status: 'en-progreso', createdOn: goalsCreatedOn, createdAt: `${goalsCreatedOn}T12:00:00Z` } as const
+const seedGoal = { userId: demoProfile.id, currency: 'CLP', status: 'en-progreso', createdOn: goalsCreatedOn, createdAt: `${goalsCreatedOn}T12:00:00Z` } as const
 export const seedSavingsGoals: SavingsGoal[] = [
   { ...seedGoal, id: 'emergency', name: 'Fondo de emergencia', target: 900_000, monthlyPlan: 80_000, targetDate: '', template: 'emergencia', icon: 'emergencia', color: '#818CF8', description: 'Reserva para gastos imprevistos.' },
   { ...seedGoal, id: 'trip', name: 'Vacaciones', target: 500_000, monthlyPlan: 60_000, targetDate: shiftDays(today, 210), template: 'viajes', icon: 'viajes', color: '#2DD4BF', description: 'Ahorro para el próximo viaje.' },

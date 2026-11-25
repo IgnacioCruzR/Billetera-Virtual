@@ -1,7 +1,7 @@
 import type { ReactNode } from 'react'
 import { Bar, BarChart, CartesianGrid, Legend, Pie, PieChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts'
 import { Select } from '@/components/ui/field'
-import { expenseCategories } from '@/features/dashboard/mock-data'
+import { useCategories } from '@/features/categories/category-context'
 import { formatCompactMoney, formatDate, formatMoney } from '@/lib/utils'
 import type { MicroExpenseAnalysis } from './micro-expense-analysis'
 import type { MicroExpenseDetectionConfig } from './micro-expense-model'
@@ -22,6 +22,7 @@ function Frame({ title, description, children, control, wide }: { title: string;
 export function MicroExpenseCharts({ analysis, hidden, view, onView }: {
   analysis: MicroExpenseAnalysis; hidden: boolean; view: MicroExpenseDetectionConfig['frequencyView']; onView: (view: MicroExpenseDetectionConfig['frequencyView']) => void;
 }) {
+  const expenseCategories = useCategories('gasto')
   const { evolution, categories, summary, patterns } = analysis
   const months = evolution.map(item => ({ ...item, label: `${formatDate(item.from, { month: 'short' })}${item.partial ? '*' : ''}` }))
   const hasPartialMonth = months.some(item => item.partial)

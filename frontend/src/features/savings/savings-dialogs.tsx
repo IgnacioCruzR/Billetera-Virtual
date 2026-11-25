@@ -1,7 +1,7 @@
 import { useState, type FormEvent } from 'react'
 import { Button } from '@/components/ui/button'
 import { Dialog, DialogContent, DialogDescription, DialogTitle } from '@/components/ui/dialog'
-import { Field, Input, Select } from '@/components/ui/field'
+import { Field, Input, MoneyInput, Select } from '@/components/ui/field'
 import { useDialogSubmission } from '@/components/ui/use-dialog-submission'
 import type { FinancialRecords } from '@/features/dashboard/model'
 import { formatMoney } from '@/lib/utils'
@@ -58,9 +58,9 @@ export function SavingsGoalForm({ history, records, today, hidden, onSave, onClo
       <fieldset disabled={submission.busy} className="min-w-0 space-y-3">
         <Field label="Nombre de la meta" error={errors.name}>{(id, attrs) => <Input id={id} value={draft.name} onChange={event => patch({ name: event.target.value })} required maxLength={90} {...attrs} />}</Field>
         <div className="grid gap-3 sm:grid-cols-2">
-          <Field label="Monto objetivo (CLP)" error={errors.target}>{(id, attrs) => <Input id={id} inputMode="numeric" value={targetText} onChange={event => setTargetText(event.target.value)} maxLength={12} required {...attrs} />}</Field>
+          <Field label="Monto objetivo (CLP)" error={errors.target}>{(id, attrs) => <MoneyInput hidden={hidden} id={id} inputMode="numeric" value={targetText} onChange={event => setTargetText(event.target.value)} maxLength={12} required {...attrs} />}</Field>
           <Field label="Fecha objetivo (opcional)" error={errors.targetDate}>{(id, attrs) => <Input id={id} type="date" value={draft.targetDate} onChange={event => patch({ targetDate: event.target.value })} {...attrs} />}</Field>
-          <Field label="Aporte mensual planificado (CLP)" error={errors.monthlyPlan}>{(id, attrs) => <Input id={id} inputMode="numeric" value={plan} onChange={event => setPlan(event.target.value)} maxLength={12} placeholder="Opcional" {...attrs} />}</Field>
+          <Field label="Aporte mensual planificado (CLP)" error={errors.monthlyPlan}>{(id, attrs) => <MoneyInput hidden={hidden} id={id} inputMode="numeric" value={plan} onChange={event => setPlan(event.target.value)} maxLength={12} placeholder="Opcional" {...attrs} />}</Field>
           <Field label="Plantilla visual" error={errors.template}>{(id, attrs) => <Select id={id} value={draft.template} onChange={event => {
             const template = goalTemplates.find(item => item.id === event.target.value)
             if (template) patch({ template: template.id, icon: template.id, color: template.color, name: draft.name || (template.id !== 'personal' ? template.name : '') })
@@ -70,7 +70,7 @@ export function SavingsGoalForm({ history, records, today, hidden, onSave, onClo
         </div>
         <Field label="Descripción (opcional)" error={errors.description}>{(id, attrs) => <textarea id={id} value={draft.description} onChange={event => patch({ description: event.target.value })} maxLength={500} className="min-h-14 w-full rounded-lg border border-border bg-secondary p-2 text-sm" {...attrs} />}</Field>
         {!existing && accounts.length > 0 && <div className="grid gap-3 sm:grid-cols-2">
-          <Field label="Aporte inicial (CLP)" error={initialError}>{(id, attrs) => <Input id={id} inputMode="numeric" value={initial} onChange={event => setInitial(event.target.value)} placeholder="Opcional" maxLength={12} {...attrs} />}</Field>
+          <Field label="Aporte inicial (CLP)" error={initialError}>{(id, attrs) => <MoneyInput hidden={hidden} id={id} inputMode="numeric" value={initial} onChange={event => setInitial(event.target.value)} placeholder="Opcional" maxLength={12} {...attrs} />}</Field>
           {initial && <Field label="Cuenta del aporte inicial">{id => <Select id={id} value={accountId} onChange={event => setAccountId(event.target.value)}><option value="">Selecciona una cuenta</option>{accounts.map(account => <option key={account.id} value={account.id}>{account.name}</option>)}</Select>}</Field>}
         </div>}
       </fieldset>
@@ -112,7 +112,7 @@ export function ReservationDialog({ history, type, records, today, hidden, prefe
       <fieldset disabled={submission.busy} className="min-w-0 space-y-3">
         <Field label={release ? 'Cuenta con reserva' : 'Cuenta del aporte'}>{id => <Select id={id} value={accountId} onChange={event => setAccountId(event.target.value)} required><option value="">Selecciona una cuenta</option>{accounts.map(item => <option key={item.id} value={item.id}>{item.name}</option>)}</Select>}</Field>
         <div className="grid gap-3 sm:grid-cols-2">
-          <Field label={release ? 'Monto a liberar (CLP)' : 'Monto del aporte (CLP)'}>{id => <Input id={id} inputMode="numeric" maxLength={12} value={amountText} onChange={event => setAmount(event.target.value)} required />}</Field>
+          <Field label={release ? 'Monto a liberar (CLP)' : 'Monto del aporte (CLP)'}>{id => <MoneyInput hidden={hidden} id={id} inputMode="numeric" maxLength={12} value={amountText} onChange={event => setAmount(event.target.value)} required />}</Field>
           <Field label="Fecha efectiva">{id => <Input id={id} type="date" max={today} value={date} onChange={event => setDate(event.target.value)} required />}</Field>
         </div>
         <Field label={release ? 'Motivo (opcional)' : 'Descripción (opcional)'}>{id => <Input id={id} value={description} onChange={event => setDescription(event.target.value)} maxLength={500} />}</Field>

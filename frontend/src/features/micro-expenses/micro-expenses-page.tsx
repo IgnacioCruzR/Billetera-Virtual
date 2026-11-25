@@ -20,7 +20,7 @@ function focusSection(id: string) {
 
 export function MicroExpensesPage({ finance, detected, today, criteria, onCriteria, hidden, onTogglePrivacy, query, onMovement, onToast, onUseSavings }: {
   finance: ReturnType<typeof useFinancialRecords>; detected: ReadonlySet<string>; today: string;
-  criteria: MicroExpenseDetectionConfig; onCriteria: (criteria: MicroExpenseDetectionConfig) => void;
+  criteria: MicroExpenseDetectionConfig; onCriteria: (criteria: MicroExpenseDetectionConfig) => Promise<void>;
   hidden: boolean; onTogglePrivacy: () => void; query?: string; onMovement: (id: string) => void; onToast: (text: string) => void;
   onUseSavings: (monthly: number, range: DateRange) => void;
 }) {
@@ -32,7 +32,7 @@ export function MicroExpensesPage({ finance, detected, today, criteria, onCriter
   const [filters, setFilters] = useState(() => ({ ...initialMicroFilters, account: params.get('cuenta') ?? '', category: params.get('categoria') ?? '', includedOnly: params.has('categoria') || params.has('cuenta') }))
   const [showSettings, setShowSettings] = useState(false)
   const [classify, setClassify] = useState<ClassificationRequest | null>(null)
-  const [scenario, setScenario] = useState<SavingsScenario | null>(null)
+  const [scenario, setScenario] = useState<SavingsScenario | null>(() => params.has('simulador') ? { ...emptySavingsScenario, includeDiscretionary: params.get('simulador') === 'prescindibles' } : null)
   const settingsTrigger = useRef<HTMLButtonElement>(null)
   const simulatorTrigger = useRef<HTMLButtonElement>(null)
   const { records, status } = finance
@@ -42,8 +42,9 @@ export function MicroExpensesPage({ finance, detected, today, criteria, onCriter
 
   useLayoutEffect(() => {
     const params = new URLSearchParams(query)
-    if (status === 'ready' && (params.has('categoria') || params.has('cuenta'))) {
-      const frame = requestAnimationFrame(() => focusSection('micro-history-title'))
+    const target = params.has('simulador') ? 'savings-title' : params.has('categoria') || params.has('cuenta') ? 'micro-history-title' : null
+    if (status === 'ready' && target) {
+      const frame = requestAnimationFrame(() => focusSection(target))
       return () => cancelAnimationFrame(frame)
     }
   }, [query, status])
@@ -98,13 +99,13 @@ export function MicroExpensesPage({ finance, detected, today, criteria, onCriter
       </div>}
       <MicroExpenseOverview analysis={analysis} hidden={hidden} />
       {scenario && <SavingsSimulator key={`simulation-${selectedMonth}-${range}`} analysis={analysis} scenario={scenario} onScenario={setScenario} hidden={hidden} onClose={() => { setScenario(null); simulatorTrigger.current?.focus() }} onUseScenario={amount => onUseSavings(amount, analysis.range)} />}
-      <MicroExpenseCharts analysis={analysis} hidden={hidden} view={criteria.frequencyView} onView={frequencyView => onCriteria({ ...criteria, frequencyView })} />
+      <MicroExpenseCharts analysis={analysis} hidden={hidden} view={criteria.frequencyView} onView={frequencyView => { void onCriteria({ ...criteria, frequencyView }).catch(() => onToast('No se pudo actualizar la vista de frecuencia.')) }} />
       <SpendingPatterns patterns={analysis.patterns} hidden={hidden} onPattern={showPattern} />
       <MicroExpenseRecommendations items={microRecommendations(analysis, hidden)} onAction={recommendation} />
       <MicroHistory key={`history-${selectedMonth}-${range}`} history={analysis.history} patterns={analysis.patterns} accounts={records.accounts} hidden={hidden} filters={filters} onFilters={setFilters} onMovement={onMovement} onClassify={setClassify} />
     </>}
-    {showSettings && <DetectionSettings config={criteria} hidden={hidden} onSave={value => {
-      onCriteria(value)
+    {showSettings && <DetectionSettings config={criteria} hidden={hidden} onSave={async value => {
+      await onCriteria(value)
       setShowSettings(false)
       onToast('Criterio de gastos hormiga actualizado.')
     }} onClose={() => setShowSettings(false)} onCloseAutoFocus={event => { event.preventDefault(); settingsTrigger.current?.focus({ preventScroll: true }) }} />}

@@ -1,5 +1,57 @@
 @import "tailwindcss";
 
+@property --health-progress {
+  syntax: '<percentage>';
+  inherits: false;
+  initial-value: 0%;
+}
+
+html[data-wallet-text="large"] {
+  font-size: 112.5%;
+}
+
+html[data-wallet-motion="reduced"] *,
+html[data-wallet-motion="reduced"] *::before,
+html[data-wallet-motion="reduced"] *::after {
+  animation-duration: 0.01ms !important;
+  animation-iteration-count: 1 !important;
+  transition-duration: 0.01ms !important;
+  scroll-behavior: auto !important;
+}
+
+.wallet-layout[data-density="compact"] main {
+  row-gap: 0.75rem;
+}
+
+.wallet-layout[data-density="compact"] main > .panel {
+  padding-block: 0.75rem;
+}
+
+.health-gauge {
+  background: conic-gradient(var(--health-tone) var(--health-progress), var(--border) 0);
+}
+
+.health-pillar-progress,
+.health-pillar-progress::-webkit-progress-bar {
+  background-color: var(--border);
+}
+
+.health-pillar-progress::-webkit-progress-value {
+  background-color: #84cc16;
+  border-radius: 9999px;
+}
+
+.health-pillar-progress::-moz-progress-bar {
+  background-color: #84cc16;
+  border-radius: 9999px;
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .health-gauge {
+    transition: --health-progress 350ms ease-out;
+  }
+}
+
 @theme inline {
   --font-sans: 'Inter Variable', system-ui, sans-serif;
   --font-display: 'Manrope Variable', 'Inter Variable', system-ui, sans-serif;

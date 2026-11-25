@@ -2,6 +2,8 @@ import type { Budget } from '@/features/budgets/budget-model'
 import type { FinancialCommitment } from '@/features/commitments/commitment-model'
 import type { MicroExpenseClassification } from '@/features/micro-expenses/micro-expense-model'
 import type { SavingsGoal, SavingsReservationOperation } from '@/features/savings/savings-model'
+import type { Category, CategoryDisplay } from '@/features/categories/category-model'
+export type { Category } from '@/features/categories/category-model'
 export type { MicroExpenseClassification, MicroExpenseStatus } from '@/features/micro-expenses/micro-expense-model'
 export { classificationLabels as microExpenseLabels, classificationOptions as microExpenseOptions } from '@/features/micro-expenses/micro-expense-model'
 
@@ -26,12 +28,6 @@ export const movementTypes = [
   { id: 'ingreso', label: 'Ingreso' },
   { id: 'transferencia', label: 'Transferencia' },
 ] as const
-
-export interface Category {
-  id: string
-  name: string
-  color: string
-}
 
 export const accountTypes = [
   { id: 'efectivo', label: 'Efectivo' }, { id: 'corriente', label: 'Cuenta corriente' },
@@ -70,6 +66,8 @@ export interface AccountAdjustment {
 }
 
 export interface FinancialRecords {
+  categories?: Category[]
+  usedCategoryIds?: ReadonlySet<string>
   accounts: Account[]
   movements: Movement[]
   budgets: Budget[]
@@ -80,7 +78,7 @@ export interface FinancialRecords {
   usedAccountIds: ReadonlySet<string>
 }
 
-export interface MovementPreset { type?: MovementType; accountId?: string; amount?: number; description?: string }
+export interface MovementPreset { type?: MovementType; accountId?: string; categoryId?: string; amount?: number; description?: string }
 
 interface MovementFields {
   accountId: string
@@ -106,7 +104,7 @@ export interface ChartPoint {
   savings: number
 }
 
-export interface ExpenseSlice extends Category {
+export interface ExpenseSlice extends CategoryDisplay {
   amount: number
 }
 

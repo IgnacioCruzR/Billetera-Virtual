@@ -1,23 +1,22 @@
+import { useCategoryName, useCategories } from '@/features/categories/category-context'
 import { useState, type FormEvent } from 'react'
 import { LoaderCircle, TriangleAlert } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Dialog, DialogContent, DialogDescription, DialogTitle } from '@/components/ui/dialog'
-import { Field, Input, Select } from '@/components/ui/field'
+import { Field, Input, MoneyInput, Select } from '@/components/ui/field'
 import { useDialogSubmission } from '@/components/ui/use-dialog-submission'
-import { expenseCategories, today } from '@/features/dashboard/mock-data'
+import { today } from '@/features/dashboard/mock-data'
 import type { FinancialRecords } from '@/features/dashboard/model'
 import { TransactionHistory } from '@/features/movements/transaction-history'
 import { isAnalyzed, microExpenseHistory } from '@/features/micro-expenses/micro-expense-detection'
 import { cn, formatMoney } from '@/lib/utils'
-import { budgetPeriod, budgetPhase, budgetStatus, conflictingBudgets, DEFAULT_WARNING_THRESHOLD, expensesInBudgetPeriod, parseBudgetPeriod, shiftBudgetPeriod, validateBudget, type BudgetView } from './budget-calculations'
-import { BudgetCategoryIcon, BudgetProgress, BudgetStatusBadge, categoryName, percentageLabel, riskLabels } from './budget-cards'
+import { budgetPeriod, budgetPhase, budgetStatus, conflictingBudgets, expensesInBudgetPeriod, parseBudgetPeriod, shiftBudgetPeriod, validateBudget, type BudgetView } from './budget-calculations'
+import { BudgetCategoryIcon, BudgetProgress, BudgetStatusBadge, percentageLabel, riskLabels } from './budget-cards'
 import { BudgetConsumptionChart } from './budget-charts'
 import { BudgetPeriodFields, periodLabel } from './budget-controls'
 import type { Budget, BudgetFormData, BudgetPeriod } from './budget-model'
 
 type CloseProps = { onClose: () => void; onCloseAutoFocus: (event: Event) => void }
-const currentPeriod = parseBudgetPeriod(today.slice(0, 7))!
-const expenseIds = expenseCategories.map(item => item.id)
 const integer = (value: string) => /^\d+$/.test(value) ? Number(value) : NaN
 
 function FormActions({ busy, label, onCancel, disabled, danger }: { busy: boolean; label: string; onCancel: () => void; disabled?: boolean; danger?: boolean }) {
@@ -29,17 +28,22 @@ function FormActions({ busy, label, onCancel, disabled, danger }: { busy: boolea
   )
 }
 
-export function BudgetForm({ records, period, suggestedCategory, editing, hidden, onSave, onClose, onCloseAutoFocus }: CloseProps & {
+export function BudgetForm({ defaultWarning, records, period, suggestedCategory, editing, hidden, onSave, onClose, onCloseAutoFocus }: CloseProps & {
+  defaultWarning: number;
   records: FinancialRecords; period: BudgetPeriod; suggestedCategory?: string; editing?: Budget; hidden: boolean;
   onSave: (data: BudgetFormData, id?: string) => Promise<void>;
 }) {
+  const categoryName = useCategoryName()
+  const expenseCategories = useCategories('gasto', true, editing?.categoryId)
+  const expenseIds = expenseCategories.map(item => item.id)
   const submission = useDialogSubmission(onClose)
+  const currentPeriod = parseBudgetPeriod(today.slice(0, 7))!
   const initialPeriod = editing?.period ?? (period < currentPeriod ? currentPeriod : period)
   const [year, setYear] = useState(initialPeriod.slice(0, 4))
   const [month, setMonth] = useState(initialPeriod.slice(5))
-  const [categoryId, setCategoryId] = useState(editing?.categoryId ?? suggestedCategory ?? '')
+  const [categoryId, setCategoryId] = useState(editing?.categoryId ?? (suggestedCategory && expenseIds.includes(suggestedCategory) ? suggestedCategory : ''))
   const [limit, setLimit] = useState(editing ? String(editing.limit) : '')
-  const [threshold, setThreshold] = useState(String(editing?.warningThreshold ?? DEFAULT_WARNING_THRESHOLD))
+  const [threshold, setThreshold] = useState(String(editing?.warningThreshold ?? defaultWarning))
   const [description, setDescription] = useState(editing?.description ?? '')
   const [errors, setErrors] = useState<ReturnType<typeof validateBudget>>({})
   const selectedPeriod = budgetPeriod(year, month)
@@ -73,7 +77,7 @@ export function BudgetForm({ records, period, suggestedCategory, editing, hidden
               <BudgetPeriodFields year={year} month={month} onYear={setYear} onMonth={setMonth} error={errors.period} />
             </fieldset>
             <div className="grid gap-3 sm:grid-cols-2">
-              <Field label="Límite mensual (CLP)" error={errors.limit}>{(id, attrs) => <Input id={id} value={limit} inputMode="numeric" maxLength={12} onChange={event => setLimit(event.target.value)} placeholder="Ej. 150000" required {...attrs} />}</Field>
+              <Field label="Límite mensual (CLP)" error={errors.limit}>{(id, attrs) => <MoneyInput hidden={hidden} id={id} value={limit} inputMode="numeric" maxLength={12} onChange={event => setLimit(event.target.value)} placeholder="Ej. 150000" required {...attrs} />}</Field>
               <Field label="Umbral de advertencia (%)" error={errors.warningThreshold}>{(id, attrs) => <Input id={id} value={threshold} inputMode="numeric" maxLength={3} onChange={event => setThreshold(event.target.value)} required {...attrs} />}</Field>
             </div>
             <Field label="Descripción (opcional)" error={errors.description}>{(id, attrs) => <Input id={id} value={description} maxLength={160} onChange={event => setDescription(event.target.value)} {...attrs} />}</Field>
@@ -96,8 +100,10 @@ export function BudgetForm({ records, period, suggestedCategory, editing, hidden
 export function DuplicateBudgetDialog({ source, budgets, all, onDuplicate, onClose, onCloseAutoFocus }: CloseProps & {
   source: Budget[]; budgets: Budget[]; all: boolean; onDuplicate: (ids: string[], period: BudgetPeriod) => Promise<void>;
 }) {
+  const categoryName = useCategoryName()
   const submission = useDialogSubmission(onClose)
   const next = shiftBudgetPeriod(source[0].period, 1)
+  const currentPeriod = parseBudgetPeriod(today.slice(0, 7))!
   const defaultPeriod = next && next >= currentPeriod ? next : currentPeriod
   const [year, setYear] = useState(defaultPeriod.slice(0, 4))
   const [month, setMonth] = useState(defaultPeriod.slice(5))
@@ -124,6 +130,7 @@ export function DuplicateBudgetDialog({ source, budgets, all, onDuplicate, onClo
 }
 
 export function DeleteBudgetDialog({ budget, onDelete, onClose, onCloseAutoFocus }: CloseProps & { budget: Budget; onDelete: () => Promise<void> }) {
+  const categoryName = useCategoryName()
   const submission = useDialogSubmission(onClose)
   return (
     <Dialog open onOpenChange={open => { if (!open) submission.close() }}>
@@ -143,6 +150,7 @@ export function DeleteBudgetDialog({ budget, onDelete, onClose, onCloseAutoFocus
 export function BudgetDetailDrawer({ budget, records, detected, hidden, onHistory, onClose, onCloseAutoFocus }: CloseProps & {
   budget: BudgetView; records: FinancialRecords; detected: ReadonlySet<string>; hidden: boolean; onHistory: () => void;
 }) {
+  const categoryName = useCategoryName()
   const expenses = expensesInBudgetPeriod(records.movements, budget.period, today).filter(item => item.categoryId === budget.categoryId)
   const previous = shiftBudgetPeriod(budget.period, -1)
   const previousBudget = records.budgets.find(item => item.period === previous && item.categoryId === budget.categoryId)

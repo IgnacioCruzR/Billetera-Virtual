@@ -1,6 +1,10 @@
 import { monthAt, shiftDays, today } from '@/features/dashboard/mock-data'
-import { microExpenseLabels, movementTypes, type Account, type MicroExpenseStatus, type Movement, type MovementType } from '@/features/dashboard/model'
-import { categories, classificationOf, isIsoDate } from './movement-data'
+import type { Account, MicroExpenseStatus, Movement, MovementType } from '@/features/dashboard/model'
+import type { CategoryDisplay } from '@/features/categories/category-model'
+import { downloadCsv } from '@/lib/csv'
+import { buildHistoryCsv } from './movement-csv'
+export { accountLabel, categoryLabel, movementTypeLabel, buildHistoryCsv } from './movement-csv'
+import { classificationOf, isIsoDate } from './movement-data'
 
 export const dateOptions = [
   { id: 'today', label: 'Hoy' }, { id: 'week', label: 'Últimos 7 días' },
@@ -73,35 +77,6 @@ export function filterHistory(movements: Movement[], filters: TransactionFilters
   }
 }
 
-export const accountLabel = (accounts: Account[], id: string) => accounts.find(item => item.id === id)?.name ?? 'Cuenta sin nombre'
-export const categoryLabel = (item: Movement) => item.type === 'transferencia' ? '' : categories.find(category => category.id === item.categoryId)?.name ?? ''
-export const movementTypeLabel = (type: MovementType) => movementTypes.find(item => item.id === type)!.label
-
-function csvField(value: string) {
-  const trimmedStart = value.trimStart()
-  const safe = /^[=+\-@＝＋－＠]/.test(trimmedStart) ? `\t${trimmedStart}`
-    : /^[\t\r\n]/.test(value) ? `'${value}` : value
-  return `"${safe.replaceAll('"', '""')}"`
-}
-
-export function buildHistoryCsv(items: Movement[], accounts: Account[], detected: ReadonlySet<string>) {
-  const headers = ['Fecha', 'Tipo', 'Descripción', 'Categoría', 'Cuenta', 'Cuenta de destino', 'Monto', 'Moneda', 'Clasificación de gasto hormiga']
-  const rows = items.map(item => [
-    item.date, movementTypeLabel(item.type), item.description, categoryLabel(item),
-    accountLabel(accounts, item.accountId), item.type === 'transferencia' ? accountLabel(accounts, item.destinationId) : '',
-    String(item.amount), 'CLP', item.type === 'gasto' ? microExpenseLabels[classificationOf(item, detected)] : '',
-  ])
-  return `\uFEFF${[headers, ...rows].map(row => row.map(csvField).join(';')).join('\r\n')}\r\n`
-}
-
-export function downloadHistory(items: Movement[], accounts: Account[], detected: ReadonlySet<string>) {
-  const blob = new Blob([buildHistoryCsv(items, accounts, detected)], { type: 'text/csv;charset=utf-8' })
-  const url = URL.createObjectURL(blob)
-  const link = document.createElement('a')
-  link.href = url
-  link.download = `movimientos-${today}.csv`
-  document.body.append(link)
-  link.click()
-  link.remove()
-  window.setTimeout(() => URL.revokeObjectURL(url), 1_000)
+export function downloadHistory(items: Movement[], accounts: Account[], detected: ReadonlySet<string>, categories: CategoryDisplay[]) {
+  downloadCsv(buildHistoryCsv(items, accounts, detected, categories), 'movimientos-' + today + '.csv')
 }

@@ -1,6 +1,6 @@
 # Indicadores financieros
 
-Financiero calcula estas consultas sobre los registros vigentes del usuario. Cada respuesta identifica la moneda, la fecha de corte o el período consultado, la zona horaria utilizada y el instante de cálculo. Cuando intervenga el criterio de gastos hormiga, también identifica la versión de preferencias. Cada consulta toma la configuración vigente y una vista consistente de sus datos financieros. Una carga tardía, anulación o reclasificación recalcula resultados históricos según los datos vigentes al consultar.
+El servicio `ms-transacciones` calculará estas consultas sobre los registros vigentes del usuario. Cada respuesta identifica la moneda, la fecha de corte o el período consultado, la zona horaria utilizada y el instante de cálculo. Cuando intervenga el criterio de gastos hormiga, también identifica la versión de preferencias. Cada consulta toma la configuración vigente y una vista consistente de sus datos financieros. Una carga tardía, anulación o reclasificación recalcula resultados históricos según los datos vigentes al consultar.
 
 ## Saldos, evolución y estadísticas
 
@@ -80,3 +80,34 @@ Los pesos se expresan como enteros porcentuales. Si la cobertura es menor a 60 o
 | Mismos ingresos, gastos y hormiga, sin presupuesto ni pagos exigibles | Cobertura 65, puntuación 77 y estado `PARCIAL`. |
 | Mes observado solo con ingresos y sin presupuestos ni pagos exigibles | Ahorro y equilibrio obtienen 100, cobertura 50 y puntuación nula. |
 | Mes sin registros de ingresos, gastos, presupuestos ni pagos | Cobertura 0 y puntuación nula. |
+
+## Metodología v2-demo de Salud financiera
+
+El módulo del Prompt 08 usa `v2-demo`. La especificación v1 anterior queda como referencia de dominio. Cada evaluación indica su versión, zona horaria del perfil, período y fecha de consulta. La pantalla y el dashboard comparten el mismo resultado.
+
+Sea `C(x) = min(100, max(0, x))`. Los ingresos `I` y gastos `G` corresponden a movimientos efectivos en CLP. Las transferencias, ajustes de saldo y reservas quedan fuera de `I` y `G`.
+
+| Pilar | Peso | Puntuación normalizada y datos necesarios |
+| --- | --- | --- |
+| Capacidad de ahorro | 30 | Tasa `(I − G) / I`. Resultado `C(100 × tasa / 0,20)`. Si `I = 0`, la tasa y el pilar quedan sin valor. |
+| Cumplimiento presupuestario | 25 | Cada límite mensual positivo `L` aporta `C(100 × (1 − max(0, gasto − L) / L))`. El resultado promedia por peso `L` los límites del período. La cobertura es `gasto cubierto / G`. Se requiere gasto cubierto positivo. Una cobertura entre 0 % y 50 %, con ambos extremos excluidos, deja el pilar provisional. Los gastos sin presupuesto se informan por separado. |
+| Equilibrio financiero | 20 | `100 × cierres diarios con saldo libre ≥ 0 / 30`. El flujo empieza en `saldo registrado − reserva vigente` y aplica los pendientes hasta cada cierre, desde el corte hasta el día 29. Los pendientes vencidos se llevan al primer día y se muestran también el mínimo y el primer déficit, incluido un faltante inicial. La vista conservadora repite el horizonte excluyendo cobros previstos. Se requiere saldo registrado y disponibilidad al corte. |
+| Control de gastos hormiga | 15 | `C(100 × (1 − (gasto prescindible / G) / 0,15))`. La marca manual de prescindible alimenta el numerador. Se requiere `G > 0` y al menos un gasto revisado como necesario o prescindible. Los candidatos pendientes quedan como señal de revisión y el pilar se indica como provisional. |
+| Cumplimiento de pagos | 10 | `100 × puntuales / (puntuales + atrasados + vencidos sin confirmar)`. Se consideran los vencimientos de los meses seleccionados que sean evaluables al corte. Una confirmación conocida al corte es puntual si su fecha efectiva es igual o anterior al vencimiento, incluso cuando el vencimiento aún no llega. Un pago pendiente que vence hoy entra al vencer el día. En un cierre histórico se incluye el último día completo. Los cobros y las cancelaciones conocidas al corte quedan fuera. Con denominador cero, el pilar queda sin valor. |
+
+Cada pilar aporta `puntos = puntuación × peso / 100`, usando la precisión del cálculo antes de presentar el valor. Se suman los cinco aportes y se redondea el total al entero más cercano, con mitades al entero superior. Por ejemplo, puntuaciones de `100, 40, 93⅓, 0, 50` aportan `30 + 10 + 18⅔ + 0 + 5`, para un resultado de **64/100**. Los tramos son 80–100 muy favorable, 60–79 favorable, 40–59 en desarrollo, 20–39 requiere atención y 0–19 atención prioritaria.
+
+Con algún pilar disponible y otro ausente, la evaluación es parcial y la puntuación global queda vacía. Si faltan todos los pilares, se indica que los datos son insuficientes. La cobertura indica la suma de los pesos observables. Una evaluación con cinco pilares queda provisional mientras el corte esté abierto o algún pilar sea provisional. Para puntuar se requiere al menos una cuenta abierta al inicio de la ventana. Los indicadores registrados que sí existen pueden consultarse aunque el período completo carezca de respaldo.
+
+### Períodos y procedencia histórica
+
+- Mes actual, mes anterior y últimas ventanas de 3, 6 o 12 meses. La serie muestra cortes mensuales. El mes abierto se detiene en la fecha local de consulta y se marca con un asterisco.
+- La variación contrasta una ventana previa del mismo tamaño y con el mismo corte de día. Un mes previo más corto que el día requerido, la ausencia de historial o un pilar sin puntuación dejan la diferencia correspondiente sin valor.
+- La demo reconstruye el pasado con registros y preferencias vigentes. Cuando existe un instante de registro, filtra las operaciones de reserva y los movimientos asociados a confirmaciones posteriores al corte. Una reprogramación sin fecha de modificación deja indeterminado el pilar de pagos o de flujo cuando afecta a ese corte. Los huecos de la serie se conservan.
+- El progreso de metas usa información vigente. Los meses de cobertura de emergencia quedan indisponibles hasta contar con un fondo identificado y un gasto esencial mensual verificable.
+
+### Simulación y recomendaciones
+
+La simulación evalúa hipótesis con los mismos cinco pilares. El gasto agregado se reparte según el consumo observado. Una categoría se puede ajustar de forma explícita y la reducción solo utiliza gastos marcados como prescindibles. Se conservan los vencimientos históricos para el cumplimiento de pagos. El horizonte hipotético usa el dinero libre inicial y los pagos incluidos, junto con los cobros previstos. Los totales hipotéticos de ingresos y gastos afectan a los pilares del período. El escenario es temporal y deja intacto el libro financiero.
+
+El plan revisa, en orden, fondos libres negativos, cuentas con faltantes, vencidos, déficits proyectados y presupuestos excedidos. Con liquidez suficiente, saldo neto positivo y sin atrasos, ofrece explorar una meta. Una marca prescindible permite enlazar al simulador. Los gastos superiores a los ingresos enlazan al historial y los candidatos pendientes sin marcas prescindibles enlazan a revisión. Cada acción se acompaña de un dato y un beneficio esperado. Los contratos futuros están en la [integración de Salud financiera](FINANCIAL_HEALTH_INTEGRATION.md).

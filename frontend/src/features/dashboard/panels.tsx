@@ -1,10 +1,13 @@
+import { useCategoryName } from '@/features/categories/category-context'
 import {
   Activity, ArrowDownLeft, ArrowDownRight, ArrowUpRight, CalendarClock, ChartNoAxesCombined,
   Coffee, CreditCard, PiggyBank, Sparkles, TrendingDown, TrendingUp, Wallet,
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
-import { cn, formatDate, formatMoney } from '@/lib/utils'
-import { BudgetProgress, BudgetStatusBadge, categoryName, percentageLabel } from '@/features/budgets/budget-cards'
+import { cn, formatMoney } from '@/lib/utils'
+import type { HealthDataState } from '@/features/health/health-data'
+import { changeText, FinancialHealthGauge, healthRange, qualityLabels } from '@/features/health/health-overview'
+import { BudgetProgress, BudgetStatusBadge, percentageLabel } from '@/features/budgets/budget-cards'
 import { CommitmentAmount, CommitmentIcon, CommitmentStatusBadge, compactDate } from '@/features/commitments/commitment-list'
 import type { FinancialCommitment } from '@/features/commitments/commitment-model'
 import { GoalProgress, progressLabel } from '@/features/savings/savings-cards'
@@ -13,12 +16,12 @@ import type { DashboardBudget, DashboardSnapshot } from './use-dashboard'
 
 const percentFormat = new Intl.NumberFormat('es-CL', { maximumFractionDigits: 1 })
 
-export function SummaryCards({ snapshot, hidden }: { snapshot: DashboardSnapshot; hidden: boolean }) {
+export function SummaryCards({ snapshot, hidden, horizon }: { snapshot: DashboardSnapshot; hidden: boolean; horizon: number }) {
   const cards = [
     { title: 'Saldo actual', amount: snapshot.balance, change: snapshot.balanceVariation, comparison: 'vs. cierre anterior', icon: Wallet, color: 'bg-primary/12 text-emerald-300' },
     { title: 'Ingresos del período', amount: snapshot.income, change: snapshot.incomeVariation, comparison: 'vs. período anterior', icon: ArrowDownLeft, color: 'bg-primary/12 text-emerald-300' },
     { title: 'Gastos del período', amount: snapshot.expense, change: snapshot.expenseVariation, comparison: 'vs. período anterior', icon: ArrowUpRight, color: 'bg-amber-400/12 text-amber-300', invert: true },
-    { title: 'Saldo proyectado', amount: snapshot.projected, change: null, comparison: 'Cobros y pagos a 30 días', icon: ChartNoAxesCombined, color: 'bg-blue-400/12 text-blue-300' },
+    { title: 'Saldo proyectado', amount: snapshot.projected, change: null, comparison: `Cobros y pagos a ${horizon} días`, icon: ChartNoAxesCombined, color: 'bg-blue-400/12 text-blue-300' },
   ]
 
   return (
@@ -50,6 +53,7 @@ export function SummaryCards({ snapshot, hidden }: { snapshot: DashboardSnapshot
 }
 
 export function BudgetPanel({ budgets, hidden }: { budgets: DashboardBudget[]; hidden: boolean }) {
+  const categoryName = useCategoryName()
   return (
     <section className="panel dashboard-anchor p-4 sm:p-5" aria-labelledby="presupuesto-title">
       <div className="flex flex-wrap items-center justify-between gap-2">
@@ -118,28 +122,27 @@ export function SmallExpensesPanel({ data, hidden }: { data: DashboardSnapshot['
   )
 }
 
-export function FinancialHealthPanel({ data }: { data: DashboardSnapshot['health'] }) {
+export function FinancialHealthPanel({ data }: { data: HealthDataState }) {
+  const report = data.status === 'ready' ? data.report : null
+  const priority = data.status === 'ready' ? data.recommendations[0] : null
   return (
-    <section id="salud" className="panel dashboard-anchor bg-gradient-to-br from-card to-[#162a2b] p-4 sm:p-5" aria-labelledby="salud-title">
+    <section className="panel bg-linear-to-br from-card to-[#18263c] p-4 sm:p-5" aria-labelledby="dashboard-health-title">
       <div className="flex items-start gap-3">
         <span className="grid size-9 shrink-0 place-items-center rounded-lg bg-primary/12 text-emerald-300"><Activity className="size-[18px]" aria-hidden="true" /></span>
-        <div>
-          <h2 className="panel-heading" id="salud-title">Salud financiera</h2>
-          <p className="mt-0.5 text-sm text-muted-foreground">{formatDate(`${data.month}-01`, { month: 'long', year: 'numeric' })} · Indicador orientativo</p>
+        <div className="min-w-0 flex-1">
+          <h2 className="panel-heading" id="dashboard-health-title">Salud financiera</h2>
+          <p className="mt-0.5 text-xs text-muted-foreground">{report ? healthRange(report.range) : 'Indicador orientativo'}</p>
         </div>
+        <a href="#salud" className="text-xs font-semibold text-emerald-300 hover:underline">Ver evaluación</a>
       </div>
-      <div className="mt-5 flex flex-wrap items-center gap-4 sm:flex-nowrap sm:gap-5">
-        <div role="meter" aria-label="Salud financiera" aria-valuemin={0} aria-valuemax={100} aria-valuenow={data.score} aria-valuetext={`${data.score} de 100, ${data.label}`} className="grid size-[107px] shrink-0 place-items-center rounded-full" style={{ background: `conic-gradient(var(--primary) ${data.score}%, var(--border) 0)` }}>
-          <div className="grid size-[90px] place-content-center rounded-full bg-[#192832] text-center" aria-hidden="true">
-            <span className="money text-4xl leading-none">{data.score}</span>
-            <span className="mt-0.5 text-xs font-medium text-muted-foreground">de 100</span>
-          </div>
-        </div>
+      {report && data.status === 'ready' ? <div className="mt-3 flex flex-wrap items-center gap-4">
+        <FinancialHealthGauge score={report.score} status={report.status} compact />
         <div className="min-w-0 flex-1 basis-40">
-          <span className="inline-flex items-center gap-1.5 rounded-md bg-primary/12 px-2 py-1 text-xs font-semibold text-emerald-300"><span className="size-1.5 rounded-full bg-primary" />{data.label}</span>
-          <p className="mt-2 text-sm leading-relaxed text-muted-foreground">{data.description}</p>
+          <p className="text-sm font-semibold">{report.status ?? qualityLabels[report.quality.state]}</p>
+          <p className="mt-0.5 text-xs text-muted-foreground">{report.quality.available} de 5 pilares disponibles · {changeText(data.history.difference)}</p>
+          {priority && <a href={priority.href} className="mt-2 inline-block text-xs font-semibold text-emerald-200 hover:underline">{priority.title}</a>}
         </div>
-      </div>
+      </div> : <p className="mt-3 text-sm text-muted-foreground">{data.status === 'error' ? 'Evaluación no disponible.' : 'Cargando evaluación…'}</p>}
     </section>
   )
 }

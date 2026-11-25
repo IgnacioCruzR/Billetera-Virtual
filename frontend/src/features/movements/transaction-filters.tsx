@@ -1,12 +1,14 @@
+import { useCategoryCatalog } from '@/features/categories/category-context'
+import type { CategoryDisplay } from '@/features/categories/category-model'
 import { useState } from 'react'
 import { Search, SlidersHorizontal, X } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Dialog, DialogContent, DialogDescription, DialogTitle, DialogTrigger } from '@/components/ui/dialog'
-import { Field, Input, Select } from '@/components/ui/field'
-import { expenseCategories, incomeCategories, today } from '@/features/dashboard/mock-data'
+import { Field, Input, MoneyInput, Select } from '@/components/ui/field'
+import { today } from '@/features/dashboard/mock-data'
 import { microExpenseLabels, movementTypes, type Account, type MovementType } from '@/features/dashboard/model'
 import { cn, formatDate, formatMoney } from '@/lib/utils'
-import { categories, isIsoDate } from './movement-data'
+import { isIsoDate } from './movement-data'
 import { accountLabel, dateOptions, emptyFilters, filterErrors, movementTypeLabel, presetRange, type TransactionFilters } from './history'
 
 type FilterProps = { accounts: Account[]; value: TransactionFilters; onChange: (value: TransactionFilters) => void }
@@ -20,15 +22,16 @@ function SearchField({ value, onChange }: Pick<FilterProps, 'value' | 'onChange'
   )
 }
 
-function FilterFields({ accounts, value, onChange, drawer = false }: FilterProps & { drawer?: boolean }) {
+function FilterFields({ accounts, value, onChange, hidden, drawer = false }: FilterProps & { drawer?: boolean; hidden: boolean }) {
   const [advanced, setAdvanced] = useState(false)
   const errors = filterErrors(value)
   const showAdvanced = drawer || advanced
-  const categoryOptions = value.type === 'gasto' ? expenseCategories : value.type === 'ingreso' ? incomeCategories : categories
+  const categories = useCategoryCatalog()
+  const categoryOptions = categories.filter(item => !value.type || item.type === value.type)
   const patch = (fields: Partial<TransactionFilters>) => onChange({ ...value, ...fields })
 
   function changeType(type: MovementType | '') {
-    const allowed = type === 'gasto' ? expenseCategories : type === 'ingreso' ? incomeCategories : categories
+    const allowed = categories.filter(item => item.type === type)
     patch({
       type, category: type !== 'transferencia' && allowed.some(item => item.id === value.category) ? value.category : '',
       classification: type === 'ingreso' || type === 'transferencia' ? '' : value.classification,
@@ -81,8 +84,8 @@ function FilterFields({ accounts, value, onChange, drawer = false }: FilterProps
         <div id={drawer ? undefined : 'history-advanced'} className={cn('grid grid-cols-2 gap-3 border-t border-border pt-4', !drawer && 'lg:grid-cols-[repeat(4,minmax(0,1fr))_minmax(0,1.4fr)]')}>
           <Field label="Fecha inicial" error={errors.dates}>{(id, attrs) => <Input id={id} type="date" value={value.from} max={today} onChange={event => patch({ preset: 'custom', from: event.target.value })} {...attrs} />}</Field>
           <Field label="Fecha final">{id => <Input id={id} type="date" value={value.to} max={today} onChange={event => patch({ preset: 'custom', to: event.target.value })} />}</Field>
-          <Field label="Monto mínimo" error={errors.amounts}>{(id, attrs) => <Input id={id} type="number" inputMode="numeric" min={0} step={1} placeholder="CLP" value={value.minimum} onChange={event => patch({ minimum: event.target.value })} {...attrs} />}</Field>
-          <Field label="Monto máximo">{id => <Input id={id} type="number" inputMode="numeric" min={0} step={1} placeholder="CLP" value={value.maximum} onChange={event => patch({ maximum: event.target.value })} />}</Field>
+          <Field label="Monto mínimo" error={errors.amounts}>{(id, attrs) => <MoneyInput hidden={hidden} id={id} type="number" min={0} step={1} placeholder="CLP" value={value.minimum} onChange={event => patch({ minimum: event.target.value })} {...attrs} />}</Field>
+          <Field label="Monto máximo">{id => <MoneyInput hidden={hidden} id={id} type="number" min={0} step={1} placeholder="CLP" value={value.maximum} onChange={event => patch({ maximum: event.target.value })} />}</Field>
           <div className={cn('col-span-2', !drawer && 'lg:col-span-1')}>
             <Field label="Clasificación">{id => (
               <Select id={id} value={value.classification} disabled={value.type === 'ingreso' || value.type === 'transferencia'} onChange={event => patch({ classification: event.target.value as TransactionFilters['classification'] })}>
@@ -97,7 +100,7 @@ function FilterFields({ accounts, value, onChange, drawer = false }: FilterProps
   )
 }
 
-function activeFilters(accounts: Account[], value: TransactionFilters) {
+function activeFilters(accounts: Account[], value: TransactionFilters, categories: CategoryDisplay[], hidden: boolean) {
   const options: { label: string; reset: Partial<TransactionFilters> }[] = []
   const date = (iso: string) => isIsoDate(iso) ? formatDate(iso, { day: 'numeric', month: 'short', year: 'numeric' }) : iso
   if (value.search.trim()) options.push({ label: `Búsqueda: ${value.search.trim()}`, reset: { search: '' } })
@@ -106,18 +109,18 @@ function activeFilters(accounts: Account[], value: TransactionFilters) {
   if (value.account) options.push({ label: accountLabel(accounts, value.account), reset: { account: '' } })
   if (value.preset && value.preset !== 'custom') options.push({ label: dateOptions.find(item => item.id === value.preset)!.label, reset: { preset: '', from: '', to: '' } })
   if (value.preset === 'custom' && (value.from || value.to)) options.push({ label: [value.from && `Desde ${date(value.from)}`, value.to && `Hasta ${date(value.to)}`].filter(Boolean).join(' · '), reset: { preset: '', from: '', to: '' } })
-  if (value.minimum !== '' || value.maximum !== '') options.push({ label: [value.minimum !== '' && `Mín. ${formatMoney(Number(value.minimum))}`, value.maximum !== '' && `Máx. ${formatMoney(Number(value.maximum))}`].filter(Boolean).join(' · '), reset: { minimum: '', maximum: '' } })
+  if (value.minimum !== '' || value.maximum !== '') options.push({ label: [value.minimum !== '' && `Mín. ${formatMoney(Number(value.minimum), hidden)}`, value.maximum !== '' && `Máx. ${formatMoney(Number(value.maximum), hidden)}`].filter(Boolean).join(' · '), reset: { minimum: '', maximum: '' } })
   if (value.classification) options.push({ label: microExpenseLabels[value.classification], reset: { classification: '' } })
   return options
 }
 
 export function HistoryFilters({ accounts, value, onChange, hidden }: FilterProps & { hidden: boolean }) {
   const [open, setOpen] = useState(false)
-  const chips = activeFilters(accounts, value)
+  const chips = activeFilters(accounts, value, useCategoryCatalog(), hidden)
 
   return (
     <div className="space-y-3 border-b border-border px-4 py-4 sm:px-5">
-      <div className="hidden lg:block"><FilterFields accounts={accounts} value={value} onChange={onChange} /></div>
+      <div className="hidden lg:block"><FilterFields accounts={accounts} value={value} onChange={onChange} hidden={hidden} /></div>
       <div className="flex gap-2 lg:hidden">
         <div className="min-w-0 flex-1"><SearchField value={value} onChange={onChange} /></div>
         <Dialog open={open} onOpenChange={setOpen}>
@@ -125,7 +128,7 @@ export function HistoryFilters({ accounts, value, onChange, hidden }: FilterProp
           <DialogContent className="h-dvh max-h-none w-full max-w-md rounded-none border-y-0 border-r-0" style={{ translate: 'none', top: 0, left: 'auto', right: 0 }}>
             <DialogTitle className="panel-heading pr-7 font-sans">Filtros del historial</DialogTitle>
             <DialogDescription className="mt-1 mb-4 text-sm text-muted-foreground">Los filtros se aplican a la lista de movimientos.</DialogDescription>
-            <FilterFields accounts={accounts} value={value} onChange={onChange} drawer />
+            <FilterFields accounts={accounts} value={value} onChange={onChange} hidden={hidden} drawer />
             <div className="mt-5 flex flex-wrap justify-end gap-2 border-t border-border pt-4">
               <Button variant="outline" onClick={() => onChange(emptyFilters)} disabled={!chips.length}>Restablecer filtros</Button>
               <Button onClick={() => setOpen(false)}>Ver resultados</Button>

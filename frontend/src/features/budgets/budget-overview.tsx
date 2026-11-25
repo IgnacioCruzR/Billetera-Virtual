@@ -1,8 +1,9 @@
+import { useCategoryName } from '@/features/categories/category-context'
 import { Activity, CircleAlert, ListChecks, Plus, ReceiptText, Target, TrendingUp, Wallet } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { formatMoney } from '@/lib/utils'
 import { budgetAlert, budgetAlertMessage, budgetStatus, daysInBudgetPeriod, type BudgetView } from './budget-calculations'
-import { BudgetCategoryIcon, BudgetProgress, categoryName, percentageLabel } from './budget-cards'
+import { BudgetCategoryIcon, BudgetProgress, percentageLabel } from './budget-cards'
 import type { BudgetHistory, BudgetPeriod, BudgetPhase, BudgetSummary } from './budget-model'
 
 export function BudgetSummaryCards({ summary, hidden }: { summary: BudgetSummary; hidden: boolean }) {
@@ -55,6 +56,7 @@ export function BudgetPace({ summary, period, phase, today, hidden }: { summary:
 }
 
 export function UnbudgetedExpenses({ summary, hidden, onCreate }: { summary: BudgetSummary; hidden: boolean; onCreate: (category: string, trigger: HTMLElement) => void }) {
+  const categoryName = useCategoryName()
   return (
     <section className="panel p-4 sm:p-5" aria-label="Gastos sin presupuesto">
       <h2 className="flex items-center gap-2 text-lg font-bold tracking-tight"><ListChecks className="size-[18px] text-primary" aria-hidden="true" /> Gastos sin presupuesto</h2>
@@ -70,6 +72,7 @@ export function UnbudgetedExpenses({ summary, hidden, onCreate }: { summary: Bud
 }
 
 export function BudgetRecommendations({ budgets, summary, history }: { budgets: BudgetView[]; summary: BudgetSummary; history: BudgetHistory[] }) {
+  const categoryName = useCategoryName()
   const urgent = budgets.filter(item => item.status === 'exceeded' || item.projection.risk === 'projected-excess')
     .sort((a, b) => b.percentage - a.percentage).slice(0, 2)
   const next = budgets.find(item => item.status === 'near' && !urgent.includes(item))
@@ -90,6 +93,7 @@ export function BudgetRecommendations({ budgets, summary, history }: { budgets: 
 }
 
 export function BudgetAlerts({ budgets }: { budgets: BudgetView[] }) {
+  const categoryName = useCategoryName()
   const alerts = budgets.flatMap(budget => {
     const kind = budgetAlert(budget.used, budget)
     return kind ? [{ id: budget.id, name: categoryName(budget.categoryId), message: budgetAlertMessage(kind, budget.warningThreshold) }] : []

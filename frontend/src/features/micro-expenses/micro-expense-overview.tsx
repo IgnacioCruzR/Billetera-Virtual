@@ -1,6 +1,6 @@
+import { useCategoryName } from '@/features/categories/category-context'
 import { ArrowDownRight, ArrowRight, ChartNoAxesCombined, Coffee, Layers3, PiggyBank } from 'lucide-react'
 import { Button } from '@/components/ui/button'
-import { categoryName } from '@/features/budgets/budget-cards'
 import { formatDate, formatMoney } from '@/lib/utils'
 import { simulateSavings, emptySavingsScenario, type MicroExpenseAnalysis } from './micro-expense-analysis'
 import type { DateRange, MicroExpenseRecommendation, SpendingPattern } from './micro-expense-model'
@@ -41,6 +41,7 @@ export function MicroExpenseOverview({ analysis, hidden }: { analysis: MicroExpe
 }
 
 export function SpendingPatterns({ patterns, hidden, onPattern }: { patterns: SpendingPattern[]; hidden: boolean; onPattern: (id: string) => void }) {
+  const categoryName = useCategoryName()
   return <section className="panel p-4 sm:p-5" aria-label="Patrones de consumo">
     <h2 className="text-lg font-bold tracking-tight">Patrones de consumo</h2>
     <p className="mt-0.5 text-xs text-muted-foreground">Selecciona un patrón para ver sus gastos asociados.</p>

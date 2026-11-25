@@ -49,6 +49,7 @@ export function confirmCommitment(records: FinancialRecords, id: string, draft: 
   return {
     ...records, commitments: records.commitments.map(item => item.id === id ? confirmed : item), movements: [movement, ...records.movements],
     usedAccountIds: new Set([...records.usedAccountIds, commitment.accountId]),
+    usedCategoryIds: new Set([...(records.usedCategoryIds ?? []), commitment.categoryId]),
   }
 }
 

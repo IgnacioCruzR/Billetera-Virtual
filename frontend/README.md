@@ -2,6 +2,8 @@
 
 Frontend de demostración en React, TypeScript, Tailwind CSS y shadcn/ui, con iconos Lucide y gráficos Recharts. Usa pesos chilenos y toma la fecha de corte en `America/Santiago`.
 
+El stack y las fronteras del sistema se describen en [Arquitectura](../ARCHITECTURE.md) y [Topología](../docs/TOPOLOGY.md).
+
 ## Ejecutar en local
 
 Usa Node.js 22.12 o superior. Desde la raíz del repositorio ejecuta:
@@ -15,6 +17,17 @@ npm run dev
 Abre la URL que imprime Vite. `npm run build` comprueba TypeScript y genera `dist/`. `npm run preview` sirve esa compilación.
 
 Las pantallas comparten los registros de demostración en memoria. Al recargar se restablecen los datos iniciales. Las alertas presupuestarias se calculan desde los límites y gastos registrados, y las reservas se derivan de los aportes y liberaciones.
+
+## Contenedor Nginx
+
+Desde la raíz del checkout, con un daemon Docker disponible, construye y sirve la misma demo.
+
+```sh
+docker build -t billetera-frontend ./frontend
+docker run --rm -p 127.0.0.1:8080:8080 billetera-frontend
+```
+
+La aplicación se abre en `http://127.0.0.1:8080/` y Nginx responde en `/healthz`. El endpoint público de integración previsto es `/graphql` del mismo host. En Kubernetes, Ingress envía esa ruta al BFF y sirve la interfaz desde Nginx. [Topología de despliegue](../docs/TOPOLOGY.md#despliegue-objetivo-en-kubernetes)
 
 ## Probar Movimientos
 
@@ -116,6 +129,8 @@ Puedes ejecutar las mismas pruebas con un Edge instalado usando `PLAYWRIGHT_CHAN
 
 `npm run test:unit` ejecuta las pruebas unitarias de presupuestos, flujo de caja, gastos hormiga y metas de ahorro con Node.js.
 
+`npm run test:coverage` exige al menos 60 % de cobertura de líneas sobre módulos de `src/` cargados por esa suite. `npm run typecheck` ejecuta el análisis estático de TypeScript y `npm run test:e2e` ejecuta la suite de navegador. [Workflow de CI](../.github/workflows/frontend-ci.yml)
+
 ## Estructura
 
 | Ruta | Responsabilidad |
@@ -136,6 +151,8 @@ Puedes ejecutar las mismas pruebas con un Edge instalado usando `PLAYWRIGHT_CHAN
 | `src/features/commitments/` | Historial, calendario, alta, detalle, confirmación, cancelación, cálculo de flujo, riesgos y simulación. |
 | `src/features/micro-expenses/` | Detección, indicadores, patrones, configuración, historial, clasificación y simulación de ahorro. |
 | `src/features/savings/` | Metas, operaciones de reserva, cálculos de disponibilidad, historial, gráficos y planificador. |
+| `src/features/health/` | Evaluación compartida, método versionado, comparación histórica, gráficos, explicaciones, plan de mejora y simulador. |
+| `src/features/assistant/` | Configuración y consentimiento, proveedor asíncrono local, simulación de compra, informes y acciones de sesión. |
 | `src/lib/calendar.ts` | Validación y aritmética de fechas de calendario, y fecha de corte por zona horaria. |
 | `tests/movements.spec.ts` | Pruebas de integración en navegador. |
 | `tests/accounts.spec.ts` | Pruebas de saldos compartidos, transferencias, ajustes, archivo, eliminación y privacidad. |
@@ -143,20 +160,35 @@ Puedes ejecutar las mismas pruebas con un Edge instalado usando `PLAYWRIGHT_CHAN
 | `tests/commitments.spec.ts` y `tests/cash-flow.unit.ts` | Pruebas de confirmación, cancelación, calendario, proyección y aislamiento de simulaciones. |
 | `tests/micro-expenses.spec.ts` y `tests/micro-expenses.unit.ts` | Pruebas de detección, indicadores, clasificación, privacidad y simulación. |
 | `tests/savings.spec.ts` y `tests/savings.unit.ts` | Pruebas del ciclo de vida, reservas, protección de fondos, proyecciones e importación de escenarios. |
+| `tests/health.spec.ts` y `tests/health.unit.ts` | Fórmulas, datos ausentes, cortes, aislamiento, actualización del dashboard, acciones, privacidad y error recuperable. |
+| `tests/assistant.spec.ts` y `tests/assistant.unit.ts` | Seis análisis, parámetros, autorización, errores, escenarios de compra, acciones permitidas, historial y privacidad. |
 | `src/components/ui/` | Primitivas reutilizables para botones, campos, diálogos y avisos emergentes. |
 | `src/index.css` | Tema oscuro y tokens de color y tipografía de Tailwind. |
 
+## Probar Salud financiera
+
+1. En la barra lateral, abre **Salud financiera** y cambia el período. **Metodología** describe el cálculo y cada tarjeta de pilar ofrece **Ver detalle**.
+2. Pulsa **Simular cambios**. Ajusta los ingresos, el gasto total o una categoría. Mueve el control de gastos prescindibles, cambia el dinero libre inicial y prueba incluir o retirar un pago pendiente del flujo. La tabla compara cada pilar con la evaluación base.
+3. Examina el ahorro potencial, el mínimo de caja y el primer déficit. **Restablecer escenario** recupera los valores base y **Cerrar simulador** descarta la hipótesis. Desde Gastos hormiga también se puede enviar a Salud financiera el porcentaje general aplicado a consumos prescindibles.
+4. Prueba **Ocultar montos** en el simulador y abre una recomendación del **Plan de mejora**. Un pago efectivo confirmado en Cobros y pagos actualiza el pilar y la evaluación compartida con el dashboard.
+
+La [metodología](../docs/FINANCIAL_INDICATORS.md#metodología-v2-demo-de-salud-financiera) especifica los cinco cálculos y la procedencia histórica. Los [contratos de integración](../docs/FINANCIAL_HEALTH_INTEGRATION.md) describen las operaciones GraphQL, el uso de MCP y las extensiones pendientes.
+
 ## Integración con GraphQL
 
-El punto de integración es `FinancialRepository`, que consume `useFinancialRecords`. Cuando exista el esquema del BFF, configura Apollo Client y `ApolloProvider` en `src/main.tsx` y conecta el repositorio a consultas y mutaciones tipadas. El servicio financiero tendrá a cargo los saldos y series históricas, la autorización, la idempotencia y la ejecución atómica de cada transferencia. Los importes CLP se mapearán sin pérdida de precisión. El historial y el período de análisis conservarán su independencia al pasar a consultas del servidor. [Documentación de Apollo Client](https://www.apollographql.com/docs/react/get-started)
+**Configuración** administra las preferencias compartidas, categorías, avisos, privacidad, consentimiento y exportación CSV. Los límites y las opciones de verificación están en la [guía de Configuración](../docs/USER_SETTINGS.md) y los [contratos candidatos](../docs/SETTINGS_GRAPHQL_CONTRACT.md).
+
+El punto de integración es `FinancialRepository`, que consume `useFinancialRecords`. Cuando exista el esquema de `bff-graphql`, Apollo Client y `ApolloProvider` se conectarán a consultas y mutaciones tipadas por `/graphql`. `ms-transacciones` es el responsable previsto de saldos, series históricas, la autorización sobre los recursos financieros, la idempotencia y la ejecución atómica de cada transferencia. Los importes CLP se mapearán sin pérdida de precisión. El historial y el período de análisis conservarán su independencia al pasar a consultas del servidor. [Topología oficial](../docs/TOPOLOGY.md) · [Documentación de Apollo Client](https://www.apollographql.com/docs/react/get-started)
+
+En **Asistente IA**, el adaptador `AssistantProvider` permite integrar la futura operación `generateFinancialAnalysis` con Apollo Client. La demo conserva en memoria el consentimiento y los informes de sesión. Consulta los [pasos para probar los seis análisis](../docs/AI_ASSISTANT.md) y la [propuesta de contrato](../docs/AI_ANALYSIS_CONTRACT.md).
 
 Para Cobros y pagos quedan por definir consultas paginadas de historial y calendario, consulta de detalle con el movimiento asociado y consulta de proyección con horizonte, fecha de corte y riesgos. Las mutaciones de alta, edición, cancelación y confirmación deberán exponer errores de dominio, control de versiones e idempotencia. La confirmación deberá devolver el compromiso y el movimiento de una misma transacción para actualizar coherentemente historial, cuentas, presupuestos y dashboard. El BFF NestJS expondrá los avisos y su estado de lectura, y la zona horaria provendrá del perfil autenticado. La demo usa `America/Santiago` del perfil de Camila. Los tipos de presentación y las hipótesis del simulador viven en el frontend. [Eventos de compromisos](../docs/DOMAIN_EVENTS.md#avisos-de-cobros-y-pagos)
 
-Para Gastos hormiga, el servicio financiero .NET tendrá la autoridad sobre detección, indicadores y proyecciones. Quedan por definir consultas GraphQL por período para resumen, series, patrones e historial paginado con referencia al movimiento, y mutaciones para guardar preferencias y clasificar gastos individualmente o en lote. Una clasificación múltiple requiere autorización sobre todos los IDs y aplicación atómica. El BFF deberá incluir el corte, la zona horaria y la versión del criterio en las respuestas derivadas.
+Para Gastos hormiga, `ms-transacciones` tendrá la autoridad sobre detección, indicadores y proyecciones. Quedan por definir consultas GraphQL por período para resumen, series, patrones e historial paginado con referencia al movimiento, y mutaciones para guardar preferencias y clasificar gastos individualmente o en lote. Una clasificación múltiple requiere autorización sobre todos los IDs y aplicación atómica. El BFF deberá incluir el corte, la zona horaria y la versión del criterio en las respuestas derivadas.
 
-La integración futura de **Salud financiera** y **MCP** podrá consumir los resultados calculados por el servicio financiero, con importes, período, clasificación y disponibilidad de datos explícitos. MCP interpretará los indicadores y podrá consultar resultados hipotéticos calculados por Financiero. El planificador de **Metas de ahorro** recibe la estimación del simulador de Gastos hormiga y la usa junto con el faltante efectivo de una meta.
+El adaptador `FinancialHealthRepository` es el punto de integración para recibir la evaluación de `ms-transacciones` mediante Apollo Client y GraphQL. El BFF invocará a `ms-agente-mcp` mediante gRPC y el agente consultará los datos autorizados de Usuarios y Transacciones por gRPC. El planificador de **Metas de ahorro** recibe la estimación del simulador de Gastos hormiga y la usa junto con el faltante efectivo de una meta.
 
-Para **Metas de ahorro** quedan por definir consultas GraphQL para resumen, disponibilidad por cuenta, metas, historial paginado y proyección con fecha de corte. Las mutaciones de alta con aporte inicial, edición, aporte, liberación, pausa, reactivación y cierre deben devolver el estado, el historial efectivo y la disponibilidad actualizada. Financiero (.NET) tendrá a cargo la validación de fondos, el control de concurrencia, la idempotencia y la atomicidad de cada operación. Para Salud financiera y la futura herramienta MCP `get_savings_progress`, el contrato debe incluir totales, aportes netos, estados, plan y proyecciones calculados por Financiero. El BFF expondrá las notificaciones y el estado de lectura. [Eventos de ahorro](../docs/DOMAIN_EVENTS.md#avisos-de-metas-de-ahorro)
+Para **Metas de ahorro** quedan por definir consultas GraphQL para resumen, disponibilidad por cuenta, metas, historial paginado y proyección con fecha de corte. Las mutaciones de alta con aporte inicial, edición, aporte, liberación, pausa, reactivación y cierre deben devolver el estado, el historial efectivo y la disponibilidad actualizada. `ms-transacciones` tendrá a cargo la validación de fondos, el control de concurrencia, la idempotencia y la atomicidad de cada operación. Para Salud financiera y la futura herramienta MCP `get_savings_progress`, el contrato debe incluir totales, aportes netos, estados, plan y proyecciones calculados por ese servicio. El BFF expondrá las notificaciones y el estado de lectura. [Eventos de ahorro](../docs/DOMAIN_EVENTS.md#avisos-de-metas-de-ahorro)
 
 ## Extensiones de dominio pendientes de aprobación
 

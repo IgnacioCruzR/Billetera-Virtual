@@ -5,7 +5,8 @@ import type { useFinancialRecords } from '@/features/accounts/account-data'
 import { reservedAt } from '@/features/savings/savings-ledger'
 import { accountsWithUpcomingShortfall } from '@/features/savings/savings-planning'
 import { registeredBalance } from '@/features/accounts/account-balances'
-import { DEFAULT_HORIZON, findRisks, pendingItems, projectCashFlow, scenarioItems, summarizeCommitments } from './cash-flow'
+import { formatMoney } from '@/lib/utils'
+import { findRisks, pendingItems, projectCashFlow, scenarioItems, summarizeCommitments } from './cash-flow'
 import { CashFlowSimulator, newScenario } from './cash-flow-simulator'
 import { CashFlowChart, CommitmentOverview, FinancialRiskPanel } from './cash-flow-view'
 import { CommitmentCalendar } from './commitment-calendar'
@@ -15,11 +16,12 @@ import { projectionHorizons, type CashFlowScenario, type ProjectionHorizon } fro
 
 type Modal = { type: 'create'; date?: string } | { type: CommitmentAction; id: string }
 
-export function CommitmentsPage({ finance, today, hidden, initialId, onClearInitial, onTogglePrivacy, onMovement, onToast }: {
+export function CommitmentsPage({ defaultHorizon, minimumFree, finance, today, hidden, initialId, onClearInitial, onTogglePrivacy, onMovement, onToast }: {
+  defaultHorizon: ProjectionHorizon; minimumFree: number | null;
   finance: ReturnType<typeof useFinancialRecords>; today: string; hidden: boolean; initialId: string | null; onClearInitial: () => void;
   onTogglePrivacy: () => void; onMovement: (id: string) => void; onToast: (message: string) => void;
 }) {
-  const [horizon, setHorizon] = useState<ProjectionHorizon>(DEFAULT_HORIZON)
+  const [horizon, setHorizon] = useState<ProjectionHorizon>(defaultHorizon)
   const [section, setSection] = useState<'lista' | 'calendario'>('lista')
   const [flowDate, setFlowDate] = useState(today)
   const [scenario, setScenario] = useState<CashFlowScenario | null>(null)
@@ -33,7 +35,8 @@ export function CommitmentsPage({ finance, today, hidden, initialId, onClearInit
   const balance = useMemo(() => registeredBalance(records, today), [records, today])
   const reserved = reservedAt(records, today)
   const shortfalls = useMemo(() => accountsWithUpcomingShortfall(records, today), [records, today])
-  const base = useMemo(() => projectCashFlow(pending, balance, today, horizon, reserved), [pending, balance, today, horizon, reserved])
+  const reserveReference = reserved + (minimumFree ?? 0)
+  const base = useMemo(() => projectCashFlow(pending, balance, today, horizon, reserveReference), [pending, balance, today, horizon, reserveReference])
   const simulated = useMemo(() => scenario ? projectCashFlow(scenarioItems(pending, scenario), balance, today, horizon, scenario.reserve) : undefined, [pending, scenario, balance, today, horizon])
   const risks = useMemo(() => findRisks(simulated ?? base, today), [simulated, base, today])
   const activeModal = modal ?? (initialId ? { type: 'detail' as const, id: initialId } : null)
@@ -84,6 +87,7 @@ export function CommitmentsPage({ finance, today, hidden, initialId, onClearInit
         <Button ref={simulatorTrigger} variant="outline" onClick={() => setScenario(value => value ? null : newScenario(base.reserve))} aria-expanded={Boolean(scenario)} aria-controls={scenario ? 'cash-flow-simulator' : undefined} className="text-violet-200"><FlaskConical aria-hidden="true" />{scenario ? 'Salir de la simulación' : 'Abrir simulador'}</Button>
       </div>
       <CommitmentOverview summary={summarizeCommitments(pending, base, today)} projection={base} hidden={hidden} />
+      {minimumFree !== null && <p className="text-xs text-muted-foreground">El margen considera {formatMoney(reserved, hidden)} de reservas efectivas y {formatMoney(minimumFree, hidden)} de dinero libre deseado.</p>}
       {reserved > 0 && shortfalls.length > 0 && <p className="rounded-xl border border-warning/30 bg-warning/8 px-4 py-3 text-sm text-amber-100">El dinero libre podría ser insuficiente para los pagos próximos o atrasados en {shortfalls.map(item => item.name).join(', ')}. <a href="#metas" className="font-semibold hover:underline">Revisar reservas</a></p>}
       {scenario && simulated && <CashFlowSimulator pending={pending} scenario={scenario} base={base} simulated={simulated} today={today} hidden={hidden} onChange={setScenario} onClose={() => { setScenario(null); simulatorTrigger.current?.focus() }} />}
       <div className="grid min-w-0 items-start gap-4 sm:gap-5 min-[1080px]:grid-cols-[minmax(0,2fr)_minmax(0,1fr)]">

@@ -12,23 +12,27 @@ import { BudgetDetailDrawer, BudgetForm, DeleteBudgetDialog, DuplicateBudgetDial
 import { BudgetAlerts, BudgetPace, BudgetRecommendations, BudgetSummaryCards, UnbudgetedExpenses } from './budget-overview'
 
 type Modal = { type: 'create'; category?: string } | { type: 'copy-all' } | { type: 'detail' | 'edit' | 'duplicate' | 'delete'; id: string }
-const currentPeriod = parseBudgetPeriod(today.slice(0, 7))!
-
-export function BudgetsPage({ finance, detected, hidden, onTogglePrivacy, onHistory, onToast }: {
+export function BudgetsPage({ defaultWarning, finance, detected, hidden, onTogglePrivacy, onHistory, onToast, query, onClearInitial }: {
+  defaultWarning: number;
   finance: ReturnType<typeof useFinancialRecords>; detected: ReadonlySet<string>; hidden: boolean; onTogglePrivacy: () => void;
   onHistory: (category: string, from: string, to: string) => void; onToast: (message: string) => void;
+  query?: string; onClearInitial: () => void;
 }) {
-  const [period, setPeriod] = useState<BudgetPeriod>(currentPeriod)
+  const currentPeriod = parseBudgetPeriod(today.slice(0, 7))!
+  const params = new URLSearchParams(query)
+  const initialId = params.get('presupuesto')
+  const [period, setPeriod] = useState<BudgetPeriod>(() => parseBudgetPeriod(params.get('mes') ?? '') ?? currentPeriod)
   const [modal, setModal] = useState<Modal | null>(null)
   const [trigger, setTrigger] = useState<HTMLElement | null>(null)
   const { records, status } = finance
-  const data = useMemo(() => summarizeBudgets(records.budgets, records.movements, period, today), [records.budgets, records.movements, period])
-  const history = useMemo(() => budgetHistory(records.budgets, records.movements, period, today), [records.budgets, records.movements, period])
-  const selected = modal && 'id' in modal ? data.items.find(item => item.id === modal.id) : undefined
+  const data = useMemo(() => summarizeBudgets(records.budgets, records.movements, period, today), [records.budgets, records.movements, period, today])
+  const history = useMemo(() => budgetHistory(records.budgets, records.movements, period, today), [records.budgets, records.movements, period, today])
+  const activeModal = modal ?? (initialId ? { type: 'detail' as const, id: initialId } : null)
+  const selected = activeModal && 'id' in activeModal ? data.items.find(item => item.id === activeModal.id) : undefined
   const source = modal?.type === 'copy-all' ? data.items : selected ? [selected] : []
 
   function open(value: Modal, source: HTMLElement | null) { onToast(''); setTrigger(source); setModal(value) }
-  function close() { setModal(null) }
+  function close() { setModal(null); if (initialId) onClearInitial() }
   function restoreFocus(event: Event) {
     event.preventDefault()
     if (trigger?.isConnected) trigger.focus({ preventScroll: true })
@@ -73,7 +77,7 @@ export function BudgetsPage({ finance, detected, hidden, onTogglePrivacy, onHist
         </div>
         <BudgetAlerts budgets={data.items} />
       </>}
-      {(modal?.type === 'create' || (modal?.type === 'edit' && selected)) && <BudgetForm records={records} period={period} suggestedCategory={modal.type === 'create' ? modal.category : undefined} editing={selected} hidden={hidden} onClose={close} onCloseAutoFocus={restoreFocus} onSave={async (draft, id) => {
+      {(modal?.type === 'create' || (modal?.type === 'edit' && selected)) && <BudgetForm defaultWarning={defaultWarning} records={records} period={period} suggestedCategory={modal.type === 'create' ? modal.category : undefined} editing={selected} hidden={hidden} onClose={close} onCloseAutoFocus={restoreFocus} onSave={async (draft, id) => {
         await finance.saveBudget(draft, id)
         setPeriod(draft.period)
         onToast(id ? 'Presupuesto actualizado.' : 'Presupuesto creado.')
@@ -87,7 +91,8 @@ export function BudgetsPage({ finance, detected, hidden, onTogglePrivacy, onHist
         await finance.removeBudget(selected.id)
         onToast('Presupuesto eliminado.')
       }} />}
-      {modal?.type === 'detail' && selected && <BudgetDetailDrawer budget={selected} records={records} detected={detected} hidden={hidden} onClose={close} onCloseAutoFocus={restoreFocus} onHistory={() => {
+      {initialId && status === 'ready' && !selected && <div role="alert" className="panel p-3 text-sm">El presupuesto solicitado ya no está disponible. <Button variant="ghost" size="sm" onClick={close}>Cerrar</Button></div>}
+      {activeModal?.type === 'detail' && selected && <BudgetDetailDrawer budget={selected} records={records} detected={detected} hidden={hidden} onClose={close} onCloseAutoFocus={restoreFocus} onHistory={() => {
         const { from, to } = budgetBounds(selected.period)
         close()
         onHistory(selected.categoryId, from, to)

@@ -1,13 +1,12 @@
+import { useCategoryName, useCategories } from '@/features/categories/category-context'
 import { useRef } from 'react'
 import { Activity, ChartNoAxesCombined, Clapperboard, Copy, Ellipsis, HeartPulse, House, Pencil, Target, TrainFront, Trash2, Utensils, WalletCards } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Popover, PopoverClose, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
-import { expenseCategories } from '@/features/dashboard/mock-data'
 import { cn, formatMoney } from '@/lib/utils'
 import type { BudgetView } from './budget-calculations'
 import type { BudgetRisk, BudgetStatus } from './budget-model'
 
-export const categoryName = (id: string) => expenseCategories.find(item => item.id === id)?.name ?? id
 
 const percent = new Intl.NumberFormat('es-CL', { maximumFractionDigits: 1 })
 const precisePercent = new Intl.NumberFormat('es-CL', { maximumFractionDigits: 12 })
@@ -33,6 +32,7 @@ export const riskLabels: Record<BudgetRisk, string> = {
 const categoryIcons = new Map([['alimentacion', Utensils], ['transporte', TrainFront], ['vivienda', House], ['salud', HeartPulse], ['entretenimiento', Clapperboard], ['otros', WalletCards]])
 
 export function BudgetCategoryIcon({ categoryId }: { categoryId: string }) {
+  const expenseCategories = useCategories('gasto')
   const Icon = categoryIcons.get(categoryId) ?? Target
   const color = expenseCategories.find(item => item.id === categoryId)?.color ?? 'var(--primary)'
   return <span className="grid size-10 shrink-0 place-items-center rounded-lg bg-secondary" style={{ color }}><Icon className="size-[19px]" aria-hidden="true" /></span>
@@ -61,6 +61,7 @@ const actions = [
 ] as const
 
 function BudgetActions({ budget, onAction }: { budget: BudgetView; onAction: BudgetActionHandler }) {
+  const categoryName = useCategoryName()
   const trigger = useRef<HTMLButtonElement>(null)
   const selected = useRef(false)
   return (
@@ -78,6 +79,7 @@ function BudgetActions({ budget, onAction }: { budget: BudgetView; onAction: Bud
 }
 
 export function BudgetCard({ budget, hidden, onAction }: { budget: BudgetView; hidden: boolean; onAction: BudgetActionHandler }) {
+  const categoryName = useCategoryName()
   const name = categoryName(budget.categoryId)
   const { risk } = budget.projection
   return (

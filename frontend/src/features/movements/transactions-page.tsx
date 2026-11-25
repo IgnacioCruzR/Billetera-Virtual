@@ -1,3 +1,4 @@
+import { useCategoryCatalog } from '@/features/categories/category-context'
 import { useMemo, useState } from 'react'
 import { ArrowDownLeft, ArrowUpRight, CircleAlert, Download, Eye, EyeOff, ListFilter, Plus, ReceiptText, Wallet } from 'lucide-react'
 import { Button } from '@/components/ui/button'
@@ -82,6 +83,7 @@ export function TransactionsPage({ movements, accounts, detected, status, onRetr
   period: Period; onPeriod: (period: Period) => void; hidden: boolean; onTogglePrivacy: () => void;
   onRegister: () => void; onAction: TransactionActionHandler; initialFilters?: Partial<TransactionFilters>;
 }) {
+  const catalog = useCategoryCatalog()
   const [filters, setFilters] = useState(() => ({ ...emptyFilters, ...initialFilters }))
   const [sort, setSort] = useState<HistorySort>('date-desc')
   const [page, setPage] = useState(1)
@@ -105,7 +107,7 @@ export function TransactionsPage({ movements, accounts, detected, status, onRetr
           <p className="mt-1 text-sm text-muted-foreground">Controla tus ingresos, gastos y transferencias.</p>
         </div>
         <div className="flex w-full flex-wrap gap-2 sm:w-auto sm:justify-end">
-          <Button variant="outline" disabled={!filtered.length || status !== 'ready'} onClick={() => downloadHistory(filtered, accounts, detected)} title={hidden ? 'El CSV incluye los montos' : undefined}><Download aria-hidden="true" /> Exportar CSV</Button>
+          <Button variant="outline" disabled={!filtered.length || status !== 'ready'} onClick={() => downloadHistory(filtered, accounts, detected, catalog)} title={hidden ? 'El CSV incluye los montos' : undefined}><Download aria-hidden="true" /> Exportar CSV</Button>
           <Button className="flex-1 sm:flex-none" disabled={!canRegister} onClick={onRegister}><Plus aria-hidden="true" /> Nuevo movimiento</Button>
         </div>
       </div>

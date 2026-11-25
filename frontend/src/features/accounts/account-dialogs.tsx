@@ -2,7 +2,7 @@ import { useState, type FormEvent } from 'react'
 import { LoaderCircle, TriangleAlert } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Dialog, DialogContent, DialogDescription, DialogTitle } from '@/components/ui/dialog'
-import { Field, Input, Select } from '@/components/ui/field'
+import { Field, Input, MoneyInput, Select } from '@/components/ui/field'
 import { useDialogSubmission } from '@/components/ui/use-dialog-submission'
 import { today } from '@/features/dashboard/mock-data'
 import { PeriodSelect } from '@/features/dashboard/navigation'
@@ -65,7 +65,7 @@ export function AccountFormDialog({ account, hidden, onSave, onClose, onCloseAut
               )}</Field>
               <Field label="Color personalizado" error={errors.color}>{(id, attrs) => <Input id={id} className="px-1.5 py-1" type="color" value={draft.color} onChange={event => patch({ color: event.target.value })} {...attrs} />}</Field>
             </div>
-            {!account && <Field label="Saldo inicial (CLP)" error={errors.initialBalance}>{(id, attrs) => <Input id={id} inputMode="numeric" required maxLength={12} value={amount} onChange={event => setAmount(event.target.value)} {...attrs} />}</Field>}
+            {!account && <Field label="Saldo inicial (CLP)" error={errors.initialBalance}>{(id, attrs) => <MoneyInput hidden={hidden} id={id} inputMode="numeric" required maxLength={12} value={amount} onChange={event => setAmount(event.target.value)} {...attrs} />}</Field>}
             <Field label="Descripción (opcional)">{id => <Input id={id} value={draft.description} onChange={event => patch({ description: event.target.value })} maxLength={140} placeholder="Ej. Gastos cotidianos" />}</Field>
             <div>
               <p className="mb-1.5 text-sm font-medium">Icono</p>
@@ -120,7 +120,7 @@ export function AccountAdjustmentDialog({ account, records, hidden, onSave, onCl
               <div><dt className="text-xs text-muted-foreground">Diferencia detectada</dt><dd className="mt-1 font-bold tabular-nums">{date && Number.isFinite(difference) ? formatMoney(difference, hidden) : '—'}</dd></div>
             </dl>
             <div className="grid grid-cols-2 gap-3">
-              <Field label="Nuevo saldo real (CLP)" error={errors.actualBalance}>{(id, attrs) => <Input id={id} inputMode="text" value={amount} onChange={event => { setAmount(event.target.value); setConfirmed(false) }} maxLength={13} required {...attrs} />}</Field>
+              <Field label="Nuevo saldo real (CLP)" error={errors.actualBalance}>{(id, attrs) => <MoneyInput hidden={hidden} id={id} inputMode="text" value={amount} onChange={event => { setAmount(event.target.value); setConfirmed(false) }} maxLength={13} required {...attrs} />}</Field>
               <Field label="Fecha del ajuste" error={errors.date}>{(id, attrs) => <Input id={id} type="date" value={date} min={account.openedOn} max={today} onChange={event => { setDate(event.target.value); setConfirmed(false) }} required {...attrs} />}</Field>
             </div>
             <Field label="Motivo del ajuste" error={errors.reason}>{(id, attrs) => <Input id={id} name="reason" maxLength={160} required placeholder="Ej. Recuento de efectivo" {...attrs} />}</Field>

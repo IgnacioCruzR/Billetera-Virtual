@@ -1,3 +1,4 @@
+import { useCategoryCatalog } from '@/features/categories/category-context'
 import { useRef } from 'react'
 import { ArrowDownLeft, ArrowLeftRight, ArrowUpRight, ChevronLeft, ChevronRight, Coffee, Ellipsis, Eye, Pencil, Trash2 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
@@ -82,6 +83,7 @@ type HistoryRowsProps = { items: Movement[]; accounts: Account[]; detected: Read
 const displayDate = (date: string) => formatDate(date, { day: 'numeric', month: 'short', year: 'numeric' })
 
 function TransactionTable({ items, accounts, detected, hidden, onAction }: HistoryRowsProps) {
+  const catalog = useCategoryCatalog()
   return (
     <div className="hidden overflow-x-auto lg:block">
       <table className="w-full border-collapse text-left text-sm">
@@ -99,7 +101,7 @@ function TransactionTable({ items, accounts, detected, hidden, onAction }: Histo
               <td className="py-2.5 pl-5"><TransactionIcon type={item.type} className="size-8" /></td>
               <th scope="row" className="max-w-52 px-2 py-2.5 font-semibold wrap-anywhere">{transactionDescription(item)}</th>
               <td className="px-2 py-2.5"><TransactionTypeBadge type={item.type} /></td>
-              <td className="px-2 py-2.5 text-muted-foreground">{categoryLabel(item) || '—'}</td>
+              <td className="px-2 py-2.5 text-muted-foreground">{categoryLabel(item, catalog) || '—'}</td>
               <td className="max-w-42 px-2 py-2.5 text-muted-foreground"><TransactionAccounts item={item} accounts={accounts} /></td>
               <td className="px-2 py-2.5 text-muted-foreground"><time dateTime={item.date}>{displayDate(item.date)}</time></td>
               <td className="px-2 py-2.5 text-right"><TransactionAmount item={item} hidden={hidden} /></td>
@@ -114,6 +116,7 @@ function TransactionTable({ items, accounts, detected, hidden, onAction }: Histo
 }
 
 function TransactionCards({ items, accounts, detected, hidden, onAction }: HistoryRowsProps) {
+  const catalog = useCategoryCatalog()
   return (
     <ul className="space-y-2.5 px-3 py-3 lg:hidden" aria-label="Movimientos del historial">
       {items.map(item => {
@@ -127,7 +130,7 @@ function TransactionCards({ items, accounts, detected, hidden, onAction }: Histo
             </div>
             <div className="mt-3 flex flex-wrap items-center justify-between gap-2 text-sm"><TransactionTypeBadge type={item.type} /><TransactionAmount item={item} hidden={hidden} /></div>
             <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 border-t border-border pt-2 text-xs text-muted-foreground">
-              <TransactionAccounts item={item} accounts={accounts} />{categoryLabel(item) && <span>{categoryLabel(item)}</span>}
+              <TransactionAccounts item={item} accounts={accounts} />{categoryLabel(item, catalog) && <span>{categoryLabel(item, catalog)}</span>}
               {classification !== 'sin-clasificacion' && <MicroExpenseBadge status={classification} />}
             </div>
           </li>

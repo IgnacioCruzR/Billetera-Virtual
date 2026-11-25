@@ -1,5 +1,7 @@
 import { useEffect, useState } from 'react'
-import { accounts, expenseCategories, incomeCategories, refreshFinancialDate, seedBudgets, seedCommitments, seedMovements, seedReservations, seedSavingsGoals, today, user } from '@/features/dashboard/mock-data'
+import { accounts, refreshFinancialDate, seedBudgets, seedCommitments, seedMovements, seedReservations, seedSavingsGoals, today } from '@/features/dashboard/mock-data'
+import { demoProfile } from '@/features/settings/settings-data'
+import { changeCategory, filterCategories, readCategories, saveCategory, seedCategories, type CategoryFormData } from '@/features/categories/category-model'
 import { cancelCommitment, confirmCommitment, validateCommitment } from '@/features/commitments/commitment-records'
 import type { CommitmentConfirmation, CommitmentFormData, FinancialCommitment } from '@/features/commitments/commitment-model'
 import { budgetPhase, conflictingBudgets, parseBudgetPeriod, validateBudget } from '@/features/budgets/budget-calculations'
@@ -67,6 +69,8 @@ export function validateAdjustment(draft: AdjustmentDraft, account: Account, cur
 
 export interface FinancialRepository {
   list(): Promise<FinancialRecords>
+  saveCategory(draft: CategoryFormData, id?: string): Promise<FinancialRecords>
+  changeCategory(id: string, action: 'archive' | 'restore' | 'delete'): Promise<FinancialRecords>
   saveMovement(draft: MovementDraft, id?: string): Promise<FinancialRecords>
   removeMovement(id: string): Promise<FinancialRecords>
   classifyExpenses(ids: string[], classification: MicroExpenseClassification): Promise<FinancialRecords>
@@ -86,7 +90,6 @@ export interface FinancialRepository {
 }
 
 const emptyRecords: FinancialRecords = { accounts: [], movements: [], budgets: [], commitments: [], adjustments: [], savingsGoals: [], reservations: [], usedAccountIds: new Set() }
-const expenseIds = expenseCategories.map(category => category.id)
 const wait = () => new Promise<void>(resolve => setTimeout(resolve, 180))
 
 function rememberAccounts(ids: ReadonlySet<string>, item: MovementDraft) {
@@ -96,9 +99,10 @@ function rememberAccounts(ids: ReadonlySet<string>, item: MovementDraft) {
   return next
 }
 
-const mockRepository: FinancialRepository = (() => {
+export function createMockFinancialRepository(): FinancialRepository {
   let records: FinancialRecords = {
     ...emptyRecords, accounts, movements: seedMovements, budgets: seedBudgets, commitments: seedCommitments, savingsGoals: seedSavingsGoals, reservations: seedReservations,
+    categories: seedCategories, usedCategoryIds: new Set(seedMovements.flatMap(item => item.type === 'transferencia' ? [] : [item.categoryId])),
     usedAccountIds: seedMovements.reduce((ids, item) => rememberAccounts(ids, item), new Set<string>()),
   }
 
@@ -118,6 +122,8 @@ const mockRepository: FinancialRepository = (() => {
 
   return {
     async list() { await wait(); return records },
+    saveCategory: (draft, id) => update(current => saveCategory(current, draft, id ?? crypto.randomUUID(), new Date().toISOString(), Boolean(id))),
+    changeCategory: (id, action) => update(current => changeCategory(current, id, action)),
     saveMovement: (draft, id) => update(current => {
       const existing = current.movements.find(item => item.id === id)
       if (id && !existing) throw new Error('El movimiento ya no está disponible.')
@@ -129,6 +135,7 @@ const mockRepository: FinancialRepository = (() => {
       const movement = { ...draft, id: id ?? crypto.randomUUID(), ...(existing?.commitmentId ? { commitmentId: existing.commitmentId } : {}) }
       return {
         ...current, usedAccountIds: rememberAccounts(current.usedAccountIds, movement),
+        usedCategoryIds: movement.type === 'transferencia' ? current.usedCategoryIds : new Set([...(current.usedCategoryIds ?? []), movement.categoryId]),
         movements: id ? current.movements.map(item => item.id === id ? movement : item) : [movement, ...current.movements],
       }
     }),
@@ -185,6 +192,7 @@ const mockRepository: FinancialRepository = (() => {
     saveBudget: (draft, id) => update(current => {
       const existing = current.budgets.find(item => item.id === id)
       if (id && !existing) throw new Error('El presupuesto ya no está disponible.')
+      const expenseIds = filterCategories(readCategories(current), 'gasto', true, existing?.categoryId).map(item => item.id)
       const error = Object.values(validateBudget(draft, current.budgets, expenseIds, today, existing))[0]
       if (error) throw new Error(error)
       const budget = { ...draft, description: draft.description.trim(), id: id ?? crypto.randomUUID() }
@@ -198,6 +206,8 @@ const mockRepository: FinancialRepository = (() => {
       if (!parseBudgetPeriod(period) || budgetPhase(period, today) === 'closed') throw new Error('Selecciona el mes actual o uno futuro.')
       const sources = current.budgets.filter(item => ids.includes(item.id))
       if (!sources.length || sources.length !== new Set(ids).size) throw new Error('La planificación de origen cambió. Vuelve a abrir la copia.')
+      const active = new Set(filterCategories(readCategories(current), 'gasto', true).map(item => item.id))
+      if (sources.some(item => !active.has(item.categoryId))) throw new Error('Reactiva las categorías archivadas antes de crear presupuestos nuevos.')
       const conflict = conflictingBudgets(current.budgets, sources, period)
       if (conflict.length || new Set(sources.map(item => item.categoryId)).size !== sources.length) {
         throw new Error('El período de destino tiene categorías en conflicto.')
@@ -209,25 +219,25 @@ const mockRepository: FinancialRepository = (() => {
       const existing = current.commitments.find(item => item.id === id)
       if (id && (!existing || existing.status !== 'pendiente')) throw new Error('Solo se pueden editar compromisos pendientes.')
       if (existing && existing.type !== draft.type) throw new Error('El tipo de un compromiso existente se conserva.')
-      const allowed = draft.type === 'cobro' ? incomeCategories : expenseCategories
+      const allowed = filterCategories(readCategories(current), draft.type === 'cobro' ? 'ingreso' : 'gasto', true, existing?.categoryId)
       const errors = validateCommitment(draft, current.accounts, allowed.map(item => item.id), today, maximumMovementAmount, existing)
       const error = Object.values(errors)[0]
       if (error) throw new Error(error)
       const form = { ...draft, name: draft.name.trim(), notes: draft.notes.trim() }
       const commitment: FinancialCommitment = existing
         ? { ...existing, ...form, status: 'pendiente', originalDueDate: existing.originalDueDate ?? (existing.dueDate === draft.dueDate ? undefined : existing.dueDate) }
-        : { ...form, id: crypto.randomUUID(), status: 'pendiente', userId: user.id, currency: 'CLP', createdAt: new Date().toISOString() }
+        : { ...form, id: crypto.randomUUID(), status: 'pendiente', userId: demoProfile.id, currency: 'CLP', createdAt: new Date().toISOString() }
       return { ...current, commitments: id ? current.commitments.map(item => item.id === id ? commitment : item) : [commitment, ...current.commitments] }
     }),
     confirmCommitment: (id, draft) => update(current => confirmCommitment(current, id, draft, today, new Date().toISOString(), () => crypto.randomUUID())),
     cancelCommitment: id => update(current => cancelCommitment(current, id, today, new Date().toISOString())),
-    saveGoal: (draft, id, initial) => update(current => saveSavingsGoal(current, draft, savingsContext(), user.id, id, initial)),
+    saveGoal: (draft, id, initial) => update(current => saveSavingsGoal(current, draft, savingsContext(), demoProfile.id, id, initial)),
     recordReservation: (type, draft) => update(current => recordReservation(current, type, draft, savingsContext())),
     changeGoalStatus: (id, action) => update(current => changeGoalStatus(current, id, action, savingsContext())),
   }
-})()
+}
 
-export function useFinancialRecords(repository = mockRepository) {
+export function useFinancialRecords(repository: FinancialRepository) {
   const [records, setRecords] = useState(emptyRecords)
   const [status, setStatus] = useState<'loading' | 'ready' | 'error'>('loading')
   const [attempt, setAttempt] = useState(0)
@@ -246,6 +256,8 @@ export function useFinancialRecords(repository = mockRepository) {
 
   return {
     records, status,
+    saveCategory: (draft: CategoryFormData, id?: string) => apply(repository.saveCategory(draft, id)),
+    changeCategory: (id: string, action: 'archive' | 'restore' | 'delete') => apply(repository.changeCategory(id, action)),
     reload() { setStatus('loading'); setAttempt(count => count + 1) },
     saveMovement: (draft: MovementDraft, id?: string) => apply(repository.saveMovement(draft, id)),
     removeMovement: (id: string) => apply(repository.removeMovement(id)),

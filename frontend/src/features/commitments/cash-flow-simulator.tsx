@@ -1,7 +1,7 @@
 import { useState, type FormEvent } from 'react'
 import { FlaskConical, RotateCcw, Trash2, X } from 'lucide-react'
 import { Button } from '@/components/ui/button'
-import { Field, Input, Select } from '@/components/ui/field'
+import { Field, Input, MoneyInput, Select } from '@/components/ui/field'
 import { maximumMovementAmount } from '@/features/movements/movement-data'
 import { isIsoDate } from '@/lib/calendar'
 import { cn, formatMoney } from '@/lib/utils'
@@ -54,13 +54,13 @@ export function CashFlowSimulator({ pending, scenario, base, simulated, today, h
           {pending.length > 0 && <optgroup label="Pendientes">{pending.map(item => <option key={item.id} value={item.id}>{item.name}</option>)}</optgroup>}
           {scenario.hypothetical.length > 0 && <optgroup label="Hipotéticos">{scenario.hypothetical.map(item => <option key={item.id} value={item.id}>{item.name}</option>)}</optgroup>}
         </Select>}</Field>
-        <ScenarioItemForm key={selected?.id ?? 'new'} item={selected} change={selected ? scenario.changes[selected.id] : undefined} today={today} onSave={submit} onRemove={selected?.hypothetical ? () => {
+        <ScenarioItemForm hidden={hidden} key={selected?.id ?? 'new'} item={selected} change={selected ? scenario.changes[selected.id] : undefined} today={today} onSave={submit} onRemove={selected?.hypothetical ? () => {
           onChange({ ...scenario, hypothetical: scenario.hypothetical.filter(item => item.id !== selected.id) })
           setTarget('')
         } : undefined} />
       </div>
       <div className="min-w-0 space-y-3">
-        <ReserveForm key={reserve} original={reserve} onSave={value => onChange({ ...scenario, reserve: value })} />
+        <ReserveForm hidden={hidden} key={reserve} original={reserve} onSave={value => onChange({ ...scenario, reserve: value })} />
         <div className="overflow-hidden rounded-lg border border-border text-sm" aria-live="polite">
           <table className="w-full table-fixed text-left">
             <caption className="sr-only">Comparación de proyecciones</caption>
@@ -79,7 +79,8 @@ export function CashFlowSimulator({ pending, scenario, base, simulated, today, h
   </section>
 }
 
-function ScenarioItemForm({ item, change, today, onSave, onRemove }: {
+function ScenarioItemForm({ item, change, today, hidden, onSave, onRemove }: {
+  hidden: boolean;
   item?: CashFlowItem; change?: CashFlowScenario['changes'][string]; today: string;
   onSave: (item: CashFlowItem, excluded: boolean) => void; onRemove?: () => void;
 }) {
@@ -111,14 +112,14 @@ function ScenarioItemForm({ item, change, today, onSave, onRemove }: {
     {item && !item.hypothetical && item.type === 'cobro' && <label className="flex items-center gap-2 text-sm"><input type="checkbox" className="size-4 accent-violet-300" checked={excluded} onChange={event => setExcluded(event.target.checked)} />Excluir este cobro del escenario</label>}
     <div className="grid gap-2 sm:grid-cols-2">
       <Field label="Fecha simulada">{id => <Input id={id} type="date" value={date} onChange={event => setDate(event.target.value)} />}</Field>
-      <Field label="Monto simulado (CLP)">{id => <Input id={id} inputMode="numeric" maxLength={12} value={amount} onChange={event => setAmount(event.target.value)} />}</Field>
+      <Field label="Monto simulado (CLP)">{id => <MoneyInput hidden={hidden} id={id} inputMode="numeric" maxLength={12} value={amount} onChange={event => setAmount(event.target.value)} />}</Field>
     </div>
     <div className="flex flex-wrap items-center gap-2"><Button type="submit" variant="outline">{item ? 'Aplicar al escenario' : 'Agregar al escenario'}</Button>{onRemove && <Button variant="ghost" onClick={onRemove}><Trash2 aria-hidden="true" />Quitar hipotético</Button>}{saved && <span role="status" className="text-xs text-violet-200">Escenario actualizado.</span>}</div>
     {error && <p role="alert" className="text-sm text-red-300">{error}</p>}
   </form>
 }
 
-function ReserveForm({ original, onSave }: { original: string; onSave: (value: number | null) => void }) {
+function ReserveForm({ original, hidden, onSave }: { original: string; hidden: boolean; onSave: (value: number | null) => void }) {
   const [reserve, setReserve] = useState(original)
   const [error, setError] = useState('')
   return <form className="space-y-2" onSubmit={event => {
@@ -132,7 +133,7 @@ function ReserveForm({ original, onSave }: { original: string; onSave: (value: n
     onSave(reserve === '' ? null : value)
   }}>
     <div className="flex flex-wrap items-end gap-2">
-      <div className="min-w-0 flex-1"><Field label="Reserva simulada (CLP)" error={error}>{(id, attrs) => <Input id={id} value={reserve} inputMode="numeric" maxLength={12} onChange={event => setReserve(event.target.value)} {...attrs} />}</Field></div>
+      <div className="min-w-0 flex-1"><Field label="Reserva simulada (CLP)" error={error}>{(id, attrs) => <MoneyInput hidden={hidden} id={id} value={reserve} inputMode="numeric" maxLength={12} onChange={event => setReserve(event.target.value)} {...attrs} />}</Field></div>
       <Button variant="outline" type="submit">Aplicar reserva</Button>
     </div>
   </form>

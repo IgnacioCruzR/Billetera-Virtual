@@ -1,3 +1,4 @@
+import { useCategoryCatalog } from '@/features/categories/category-context'
 import { useRef, useState } from 'react'
 import { LoaderCircle, TriangleAlert } from 'lucide-react'
 import { Button } from '@/components/ui/button'
@@ -13,6 +14,7 @@ type DialogProps = { item: Movement; onClose: () => void; onCloseAutoFocus: (eve
 export function TransactionDetailDrawer({ item, accounts, detected, hidden, onClose, onCloseAutoFocus, onCommitment }: DialogProps & {
   accounts: Account[]; detected: ReadonlySet<string>; hidden: boolean; onCommitment: (id: string) => void;
 }) {
+  const catalog = useCategoryCatalog()
   return (
     <Dialog open onOpenChange={open => { if (!open) onClose() }}>
       <DialogContent onCloseAutoFocus={onCloseAutoFocus} className="h-dvh max-h-none w-full max-w-md rounded-none border-y-0 border-r-0" style={{ top: 0, left: 'auto', right: 0, translate: 'none' }}>
@@ -26,7 +28,7 @@ export function TransactionDetailDrawer({ item, accounts, detected, hidden, onCl
           <div><dt>Tipo</dt><dd><TransactionTypeBadge type={item.type} /></dd></div>
           <div><dt>Fecha</dt><dd><time dateTime={item.date}>{formatDate(item.date, { day: 'numeric', month: 'long', year: 'numeric' })}</time></dd></div>
           <div><dt>{item.type === 'ingreso' ? 'Cuenta de destino' : 'Cuenta de origen'}</dt><dd>{accountLabel(accounts, item.accountId)}</dd></div>
-          {item.type === 'transferencia' ? <div><dt>Cuenta de destino</dt><dd>{accountLabel(accounts, item.destinationId)}</dd></div> : <div><dt>Categoría</dt><dd>{categoryLabel(item) || '—'}</dd></div>}
+          {item.type === 'transferencia' ? <div><dt>Cuenta de destino</dt><dd>{accountLabel(accounts, item.destinationId)}</dd></div> : <div><dt>Categoría</dt><dd>{categoryLabel(item, catalog) || '—'}</dd></div>}
           {item.type === 'gasto' && <div><dt>Clasificación</dt><dd><MicroExpenseBadge status={classificationOf(item, detected)} /></dd></div>}
           <div><dt>Moneda</dt><dd>CLP</dd></div>
         </dl>

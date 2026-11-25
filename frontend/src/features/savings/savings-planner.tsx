@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { ArrowUpRight, CalendarClock, Calculator, X } from 'lucide-react'
 import { Button } from '@/components/ui/button'
-import { Field, Input, Select } from '@/components/ui/field'
+import { Field, Input, MoneyInput, Select } from '@/components/ui/field'
 import { formatMoney } from '@/lib/utils'
 import { isIsoDate } from '@/lib/calendar'
 import { savingsDate } from './savings-cards'
@@ -59,7 +59,7 @@ function Strategy({ history, scenarios, scenarioId, today, hidden }: { history: 
       </dl>
       <p className="text-xs text-muted-foreground">Restante para el objetivo · <strong>{formatMoney(typical.remaining, hidden)}</strong></p>
       {goal.status === 'pausada' && <p className="text-xs text-amber-200">Meta pausada. Reactívala para registrar nuevos aportes.</p>}
-      <Field label="Aporte mensual habitual (CLP)" error={monthlyInvalid ? 'Ingresa un monto entero mayor o igual a cero.' : undefined}>{(id, attrs) => <Input id={id} type={hidden ? 'password' : 'text'} inputMode="numeric" value={monthlyText} onChange={event => setMonthly(event.target.value)} {...attrs} />}</Field>
+      <Field label="Aporte mensual habitual (CLP)" error={monthlyInvalid ? 'Ingresa un monto entero mayor o igual a cero.' : undefined}>{(id, attrs) => <MoneyInput hidden={hidden} id={id} inputMode="numeric" value={monthlyText} onChange={event => setMonthly(event.target.value)} {...attrs} />}</Field>
       <p className="text-xs text-muted-foreground">{habitual.source === 'history' ? 'Sugerencia basada en los últimos tres meses cerrados.' : habitual.source === 'plan' ? 'Valor inicial tomado del plan de la meta.' : 'Puedes ingresar un aporte habitual para estimar la fecha.'}</p>
       <Field label="Fecha deseada" error={dateInvalid ? 'Elige una fecha válida.' : undefined}>{(id, attrs) => <Input id={id} type="date" value={desired} onChange={event => setDesired(event.target.value)} {...attrs} />}</Field>
       <Field label="Escenario de ahorro adicional">{id => <Select id={id} value={source} onChange={event => setSource(event.target.value)}>
@@ -68,7 +68,7 @@ function Strategy({ history, scenarios, scenarioId, today, hidden }: { history: 
       </Select>}</Field>
       {unavailable && !source && <p className="text-xs text-muted-foreground">El escenario enlazado ya no está disponible en esta sesión.</p>}
       {savedScenario && <p className="text-xs text-muted-foreground">Consumos del {savingsDate(savedScenario.from)} al {savingsDate(savedScenario.to)}.</p>}
-      {source === 'manual' && <Field label="Ahorro adicional mensual (CLP)" error={manualInvalid ? 'Ingresa un monto entero mayor o igual a cero.' : undefined}>{(id, attrs) => <Input id={id} type={hidden ? 'password' : 'text'} inputMode="numeric" value={bespoke} onChange={event => setBespoke(event.target.value)} {...attrs} />}</Field>}
+      {source === 'manual' && <Field label="Ahorro adicional mensual (CLP)" error={manualInvalid ? 'Ingresa un monto entero mayor o igual a cero.' : undefined}>{(id, attrs) => <MoneyInput hidden={hidden} id={id} inputMode="numeric" value={bespoke} onChange={event => setBespoke(event.target.value)} {...attrs} />}</Field>}
       <a href="#hormiga" className="inline-flex items-center gap-1 text-sm font-semibold text-emerald-200 hover:underline">Crear escenario en Gastos hormiga<ArrowUpRight className="size-4" aria-hidden="true" /></a>
       <p className="text-xs leading-relaxed text-muted-foreground">El calendario supone un aporte mensual desde el próximo mes en el mismo día de hoy. Si ese día no existe, usa el último del mes.</p>
     </div>

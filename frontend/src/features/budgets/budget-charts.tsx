@@ -1,9 +1,9 @@
 import { ChartNoAxesCombined, ChartPie } from 'lucide-react'
 import { Bar, CartesianGrid, Cell, ComposedChart, Line, Pie, PieChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts'
-import { expenseCategories } from '@/features/dashboard/mock-data'
+import { useCategories, useCategoryName } from '@/features/categories/category-context'
 import { formatCompactMoney, formatMoney } from '@/lib/utils'
 import { consumptionPoints, type BudgetView } from './budget-calculations'
-import { categoryName, percentageLabel } from './budget-cards'
+import { percentageLabel } from './budget-cards'
 import { periodLabel } from './budget-controls'
 import type { BudgetHistory, BudgetPhase } from './budget-model'
 
@@ -60,6 +60,8 @@ export function BudgetHistoryChart({ data, hidden }: { data: BudgetHistory[]; hi
 }
 
 export function BudgetDistributionChart({ budgets, hidden }: { budgets: BudgetView[]; hidden: boolean }) {
+  const expenseCategories = useCategories('gasto')
+  const categoryName = useCategoryName()
   const data = budgets.map(item => ({ name: categoryName(item.categoryId), limit: item.limit, color: expenseCategories.find(category => category.id === item.categoryId)?.color ?? '#10B981' }))
   const total = budgets.reduce((sum, item) => sum + item.limit, 0)
   return (

@@ -3,7 +3,7 @@ import { ArrowDownLeft, ArrowUpRight, Ban, CheckCircle2, Ellipsis, Eye, Pencil, 
 import { Button } from '@/components/ui/button'
 import { Field, Input, Select } from '@/components/ui/field'
 import { Popover, PopoverClose, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
-import { expenseCategories, incomeCategories } from '@/features/dashboard/mock-data'
+import { useCategories, useCategoryName } from '@/features/categories/category-context'
 import type { Account } from '@/features/dashboard/model'
 import { accountLabel } from '@/features/movements/history'
 import { cn, formatDate, formatMoney } from '@/lib/utils'
@@ -12,8 +12,6 @@ import type { CommitmentFilters, CommitmentSort, CommitmentType, CommitmentVisua
 
 export const commitmentTypes = [{ id: 'cobro', label: 'Cobro' }, { id: 'pago', label: 'Pago' }] as const
 export const commitmentTypeLabel = (type: CommitmentType) => type === 'cobro' ? 'Cobro' : 'Pago'
-export const categoriesForCommitment = (type: CommitmentType) => type === 'cobro' ? incomeCategories : expenseCategories
-export const commitmentCategoryLabel = (item: FinancialCommitment) => categoriesForCommitment(item.type).find(category => category.id === item.categoryId)?.name ?? item.categoryId
 export const compactDate = (date: string) => formatDate(date, { day: 'numeric', month: 'short' })
 export const longDate = (date: string) => formatDate(date, { day: 'numeric', month: 'long', year: 'numeric' })
 
@@ -65,13 +63,14 @@ function CommitmentActions({ item, onAction }: { item: FinancialCommitment; onAc
 export function CommitmentRows({ items, accounts, today, hidden, onAction, compact = false }: {
   items: FinancialCommitment[]; accounts: Account[]; today: string; hidden: boolean; onAction: CommitmentActionHandler; compact?: boolean;
 }) {
+  const categoryName = useCategoryName()
   return <>
     {!compact && <div className="hidden overflow-x-auto lg:block"><table className="w-full text-left text-sm">
       <caption className="sr-only">Listado de cobros y pagos</caption>
       <thead className="border-y border-border bg-secondary/60 text-xs text-muted-foreground"><tr>{['Nombre', 'Tipo', 'Categoría', 'Cuenta', 'Vencimiento', 'Monto', 'Estado', 'Acciones'].map(label => <th key={label} scope="col" className="px-3 py-3 first:pl-5 last:text-right">{label}</th>)}</tr></thead>
       <tbody className="divide-y divide-border">{items.map(item => <tr key={item.id} className={visualStatus(item, today) === 'vencido' ? 'bg-warning/4' : undefined}>
         <th scope="row" className="px-3 py-2.5 pl-5"><div className="flex items-center gap-2.5"><CommitmentIcon type={item.type} /><Button variant="ghost" className="h-auto justify-start px-0 py-1 text-left font-semibold whitespace-normal text-foreground wrap-anywhere hover:text-emerald-300" onClick={event => onAction('detail', item.id, event.currentTarget)}>{item.name}</Button></div></th>
-        <td className="px-3 py-2.5">{commitmentTypeLabel(item.type)}</td><td className="px-3 py-2.5 text-muted-foreground">{commitmentCategoryLabel(item)}</td>
+        <td className="px-3 py-2.5">{commitmentTypeLabel(item.type)}</td><td className="px-3 py-2.5 text-muted-foreground">{categoryName(item.categoryId)}</td>
         <td className="px-3 py-2.5 text-muted-foreground">{accountLabel(accounts, item.accountId)}</td><td className="px-3 py-2.5"><time dateTime={item.dueDate}>{longDate(item.dueDate)}</time></td>
         <td className="px-3 py-2.5"><CommitmentAmount type={item.type} amount={item.amount} hidden={hidden} /></td><td className="px-3 py-2.5"><CommitmentStatusBadge item={item} today={today} /></td>
         <td className="px-3 py-2.5 text-right"><CommitmentActions item={item} onAction={onAction} /></td>
@@ -80,7 +79,7 @@ export function CommitmentRows({ items, accounts, today, hidden, onAction, compa
     <ul className={cn('grid gap-2.5', compact ? '' : 'px-3 py-3 lg:hidden')} aria-label={compact ? 'Compromisos del día' : 'Cobros y pagos'}>{items.map(item => <li className={cn('min-w-0 rounded-xl border border-border bg-secondary/50 p-3', visualStatus(item, today) === 'vencido' && 'border-warning/35')} key={item.id}>
       <div className="flex min-w-0 items-start gap-2.5"><CommitmentIcon type={item.type} /><div className="min-w-0 flex-1"><Button variant="ghost" className="h-auto max-w-full justify-start px-0 py-0 text-left whitespace-normal text-foreground wrap-anywhere" onClick={event => onAction('detail', item.id, event.currentTarget)}>{item.name}</Button><p className="mt-0.5 text-xs text-muted-foreground">{commitmentTypeLabel(item.type)} · <time dateTime={item.dueDate}>{longDate(item.dueDate)}</time></p></div><CommitmentActions item={item} onAction={onAction} /></div>
       <div className="mt-2.5 flex flex-wrap items-center justify-between gap-1.5"><CommitmentStatusBadge item={item} today={today} /><CommitmentAmount type={item.type} amount={item.amount} hidden={hidden} /></div>
-      <p className="mt-2 text-xs text-muted-foreground">{accountLabel(accounts, item.accountId)} · {commitmentCategoryLabel(item)}</p>
+      <p className="mt-2 text-xs text-muted-foreground">{accountLabel(accounts, item.accountId)} · {categoryName(item.categoryId)}</p>
     </li>)}</ul>
   </>
 }
@@ -91,7 +90,7 @@ export function CommitmentList({ items, accounts, today, hidden, onAction }: { i
   const [filters, setFilters] = useState(emptyFilters)
   const [sort, setSort] = useState<CommitmentSort>('prioridad')
   const filtered = useMemo(() => filterCommitments(items, filters, sort, today), [items, filters, sort, today])
-  const categories = filters.type ? categoriesForCommitment(filters.type) : [...incomeCategories, ...expenseCategories]
+  const categories = useCategories(filters.type === 'cobro' ? 'ingreso' : filters.type === 'pago' ? 'gasto' : undefined)
   const patch = (value: Partial<CommitmentFilters>) => setFilters(current => ({ ...current, ...value }))
   const invalid = Boolean(filters.from && filters.to && filters.from > filters.to)
 

@@ -29,9 +29,10 @@ export function analyzeMicroExpenses(movements: Movement[], detected: ReadonlySe
   const firstPrior = shiftBudgetPeriod(periods[0].month, -count)
   const lastPrior = shiftBudgetPeriod(end, -count)
   const range = { from: periods[0].from, to: selectedEnd.to }
-  const previous = firstPrior && lastPrior ? {
+  const sameCutoff = lastPrior && (!selectedEnd.partial || selectedEnd.observedDays <= daysInBudgetPeriod(lastPrior))
+  const previous = firstPrior && lastPrior && sameCutoff ? {
     from: budgetBounds(firstPrior).from,
-    to: selectedEnd.partial ? `${lastPrior}-${String(Math.min(daysInBudgetPeriod(lastPrior), selectedEnd.observedDays)).padStart(2, '0')}` : budgetBounds(lastPrior).to,
+    to: selectedEnd.partial ? `${lastPrior}-${String(selectedEnd.observedDays).padStart(2, '0')}` : budgetBounds(lastPrior).to,
   } : null
   const effective = movements.filter(item => item.date <= today)
   const expenses = effective.flatMap(item => item.type === 'gasto' ? [microExpenseHistory(item, detected)] : [])
@@ -91,6 +92,7 @@ export function analyzeMicroExpenses(movements: Movement[], detected: ReadonlySe
   })
   return { summary, range, previous, patterns, history, included, categories, weekdays, evolution, monthValue, monthlyFor, partial: selectedEnd.partial }
 }
+
 
 export type MicroExpenseAnalysis = ReturnType<typeof analyzeMicroExpenses>
 

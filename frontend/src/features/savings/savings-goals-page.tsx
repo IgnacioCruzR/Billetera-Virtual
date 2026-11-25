@@ -29,11 +29,12 @@ export function SavingsGoalsPage({ finance, today, hidden, onTogglePrivacy, scen
   const params = new URLSearchParams(query)
   const accountId = params.get('cuenta') ?? ''
   const scenarioId = params.get('escenario') ?? undefined
+  const directPlanner = Boolean(scenarioId || params.has('plan'))
   const { records, status } = finance
   const [filter, setFilter] = useState<SavingsGoalStatus | ''>('')
   const [modal, setModal] = useState<Modal | null>(null)
-  const [planner, setPlanner] = useState(Boolean(scenarioId))
-  const [plannedId, setPlannedId] = useState('')
+  const [planner, setPlanner] = useState(directPlanner)
+  const [plannedId, setPlannedId] = useState(() => params.get('meta') ?? '')
   const trigger = useRef<HTMLElement | null>(null)
   const plannerTrigger = useRef<HTMLButtonElement>(null)
   const histories = useMemo(() => records.savingsGoals.map(goal => goalHistory(goal, records, today)), [records, today])
@@ -64,11 +65,11 @@ export function SavingsGoalsPage({ finance, today, hidden, onTogglePrivacy, scen
   }
 
   useEffect(() => {
-    if (status === 'ready' && scenarioId) {
+    if (status === 'ready' && directPlanner) {
       const frame = requestAnimationFrame(focusPlanner)
       return () => cancelAnimationFrame(frame)
     }
-  }, [status, scenarioId])
+  }, [status, directPlanner])
 
   const lifecycle = modal?.action === 'pausar' || modal?.action === 'reactivar' || modal?.action === 'finalizar' || modal?.action === 'cancelar' ? modal.action : null
   const reservation = modal?.action === 'aporte' || modal?.action === 'liberacion' ? modal.action : null

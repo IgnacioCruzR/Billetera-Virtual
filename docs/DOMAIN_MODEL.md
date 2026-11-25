@@ -6,32 +6,12 @@ Billetera Virtual organiza registros de finanzas personales. Los ingresos, gasto
 
 | Contexto | Dueño | Responsabilidad |
 | --- | --- | --- |
-| Identidad y preferencias | Usuarios, Go | Registro, autenticación, identidad, zona horaria, moneda inicial y criterios de gastos hormiga. |
-| Finanzas personales | Financiero, .NET y C# | Cuentas, movimientos, clasificación, presupuestos, compromisos, metas, cálculos financieros y consultas analíticas. |
-| Alertas y notificaciones | Notificaciones, Java y Spring Boot | Reglas personales de alerta, evaluación de disparadores, bandeja y deduplicación del procesamiento. |
-| Asistencia financiera | Servidor MCP con LLM externo | Consulta autorizada de datos derivados y explicación de resultados. Inicialmente opera en solo lectura y carece de persistencia propia. |
+| Identidad y preferencias | `ms-usuarios`, Go | Registro, autenticación, identidad, zona horaria, moneda inicial y criterios de gastos hormiga. Base `postgres-usuarios`. |
+| Finanzas personales | `ms-transacciones`, NestJS y TypeScript | Cuentas, movimientos, ingresos, gastos, transferencias, categorías, compromisos, presupuestos, proyecciones, gastos hormiga, metas, reservas, salud financiera y eventos. Base `postgres-transacciones`. |
+| Alertas y notificaciones | `ms-notificaciones`, Java y Spring Boot | Reglas personales de alerta, evaluación de disparadores, bandeja y deduplicación del procesamiento. Base `postgres-notificaciones`. |
+| Asistencia financiera | `ms-agente-mcp`, TypeScript y SDK oficial de MCP | Consulta autorizada por gRPC a Usuarios y Transacciones y explicación mediante un LLM externo por HTTPS. Operación inicial de solo lectura y sin persistencia propia. |
 
-React con TypeScript y Apollo Client consume el GraphQL del BFF en NestJS. Los servicios se consultan por gRPC y publican hechos de integración por Apache Kafka. Usuarios, Financiero y Notificaciones tienen cada uno su propia base PostgreSQL. Las referencias externas usan identificadores opacos y contratos de servicio. La identidad pertenece a Usuarios y los otros contextos usan su `usuarioId` como referencia de propietario. El criterio de modelado DDD aplica agregados dentro de cada contexto y referencias por identificador entre ellos. [Guía de modelado de dominio de Microsoft](https://learn.microsoft.com/en-us/dotnet/architecture/microservices/microservice-ddd-cqrs-patterns/microservice-domain-model)
-
-```mermaid
-flowchart LR
-    Web[React y Apollo Client] -->|GraphQL| BFF[BFF NestJS]
-    BFF -->|gRPC| U[Usuarios]
-    BFF -->|gRPC| F[Financiero]
-    BFF -->|gRPC| N[Notificaciones]
-    BFF -->|gRPC con contexto autenticado| MCP[Servidor MCP]
-    MCP -->|Herramientas de lectura por gRPC| F
-    MCP <-->|Invocacion de herramientas y respuesta| LLM[LLM externo]
-    F -->|Preferencias por gRPC| U
-    N -->|Zona horaria por gRPC| U
-    N -->|Estado financiero por gRPC| F
-    U -->|Publica| K[Apache Kafka]
-    F -->|Publica| K
-    K -->|Entrega eventos| N
-    U --- PU[(PostgreSQL Usuarios)]
-    F --- PF[(PostgreSQL Financiero)]
-    N --- PN[(PostgreSQL Notificaciones)]
-```
+Los contextos se coordinan mediante las conexiones definidas en la [topología oficial](TOPOLOGY.md). Las referencias externas usan identificadores opacos y contratos de servicio, sin claves foráneas entre bases. La identidad pertenece a `ms-usuarios` y los otros contextos usan su `usuarioId` como referencia de propietario. Cada agregado y sus invariantes pertenecen a su contexto. La [distribución de responsabilidades](../ARCHITECTURE.md#distribución-de-responsabilidades) identifica los módulos internos del dominio financiero.
 
 ## Tipos y objetos de valor
 
@@ -48,7 +28,7 @@ flowchart LR
 | `IdentidadDeComando` | `usuarioId: UUID`, `operacion: string`, `clave: UUID` | Identifica un reintento de escritura dentro del servicio propietario. |
 | `ReferenciaAlerta` | `tipoRecurso: enum`, `recursoId: UUID`, `discriminador: string` | Identifica el presupuesto y umbral, o el compromiso y fecha de vencimiento, que motivaron un aviso. |
 
-El saldo actual, el saldo proyectado, los gastos hormiga, las estadísticas y el indicador de salud son resultados derivados. Se calculan a partir de movimientos vigentes, compromisos, presupuestos, aportes y preferencias según corresponda. Sus contratos de consulta están en [Indicadores financieros](FINANCIAL_INDICATORS.md).
+El saldo actual, el saldo proyectado, los gastos hormiga, las estadísticas y el indicador de salud son resultados derivados. Se calculan a partir de movimientos vigentes, compromisos, presupuestos, aportes y preferencias según corresponda. La [especificación de indicadores](FINANCIAL_INDICATORS.md) define su semántica. Los esquemas de integración están pendientes.
 
 ## Identidad y preferencias
 
@@ -88,7 +68,7 @@ erDiagram
 
 La cardinalidad de `Transferencia` a `Movimiento` se restringe a exactamente dos por [RN-05](BUSINESS_RULES.md#cuentas-movimientos-y-transferencias). Cada movimiento de origen `COMPROMISO` exige un compromiso y cada compromiso confirmado exige exactamente un movimiento. `categoriaId` es obligatorio para ingresos y gastos y queda vacío para las dos piernas de transferencia. `clasificacionHormiga` existe para gastos y comienza como `AUTOMATICA`. Cada presupuesto pertenece a una categoría de gasto. Una meta puede contener cero o más aportes. Cada usuario tiene de cero a muchos registros de cada raíz financiera.
 
-La coordinación entre raíces ocurre dentro de Financiero. Este servicio confirma un compromiso y su movimiento, o registra una transferencia y sus movimientos, en una única transacción de su base. El registro y la liberación de aportes coordinan la meta y la disponibilidad global del mismo usuario. El detalle de las transiciones y concurrencia está en [Reglas de negocio](BUSINESS_RULES.md).
+La coordinación entre raíces ocurre dentro de `ms-transacciones`. Este servicio confirma un compromiso y su movimiento, o registra una transferencia y sus movimientos, en una única transacción de su base. El registro y la liberación de aportes coordinan la meta y la disponibilidad global del mismo usuario. El detalle de las transiciones y concurrencia está en [Reglas de negocio](BUSINESS_RULES.md).
 
 ## Alertas y notificaciones
 

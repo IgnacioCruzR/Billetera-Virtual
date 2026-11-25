@@ -1,9 +1,9 @@
+import { useCategoryName } from '@/features/categories/category-context'
 import { useState } from 'react'
 import { FlaskConical, Plus, RotateCcw, X } from 'lucide-react'
 import { Bar, BarChart, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts'
 import { Button } from '@/components/ui/button'
 import { Field, Select } from '@/components/ui/field'
-import { categoryName } from '@/features/budgets/budget-cards'
 import { transactionDescription } from '@/features/movements/transaction-history'
 import { formatCompactMoney, formatDate, formatMoney } from '@/lib/utils'
 import { emptySavingsScenario, simulateSavings, type MicroExpenseAnalysis } from './micro-expense-analysis'
@@ -20,6 +20,7 @@ function Reduction({ label, value, onValue }: { label: string; value: number; on
 export function SavingsSimulator({ analysis, scenario, hidden, onScenario, onClose, onUseScenario }: {
   analysis: MicroExpenseAnalysis; scenario: SavingsScenario; hidden: boolean; onScenario: (scenario: SavingsScenario) => void; onClose: () => void; onUseScenario: (monthly: number) => void;
 }) {
+  const categoryName = useCategoryName()
   const [movementId, setMovementId] = useState('')
   const data = simulateSavings(analysis, scenario)
   const selectedOther = analysis.history.filter(item => scenario.movementIds.includes(item.movement.id))
@@ -80,6 +81,7 @@ export function SavingsSimulator({ analysis, scenario, hidden, onScenario, onClo
         </div>
         <p className="text-xs leading-relaxed text-muted-foreground">El escenario aplica el porcentaje por patrón cuando lo configuras. Cada movimiento se cuenta una vez y el ahorro calculado queda como estimación.</p>
         <Button variant="outline" className="h-auto max-w-full whitespace-normal py-2" disabled={data.monthly === null || data.monthly <= 0} onClick={() => { if (data.monthly !== null && data.monthly > 0) onUseScenario(data.monthly) }}>Comparar este escenario en Metas de ahorro</Button>
+        {scenario.includeDiscretionary && <a className="block w-fit text-sm font-semibold text-primary hover:underline" href={`#salud?reduccion=${scenario.reduction}`}>Usar el porcentaje general en Salud financiera</a>}
       </div>
     </div>
   </section>

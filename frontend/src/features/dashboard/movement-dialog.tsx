@@ -1,17 +1,18 @@
+import { useCategories } from '@/features/categories/category-context'
 import { useRef, useState, type FormEvent } from 'react'
 import { ArrowDownLeft, ArrowLeftRight, ArrowUpRight, LoaderCircle } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Dialog, DialogContent, DialogDescription, DialogTitle } from '@/components/ui/dialog'
-import { Field, Input, Select } from '@/components/ui/field'
+import { Field, Input, MoneyInput, Select } from '@/components/ui/field'
 import { validateMovement } from '@/features/movements/movement-data'
 import { cn } from '@/lib/utils'
-import { expenseCategories, incomeCategories, today } from './mock-data'
+import { today } from './mock-data'
 import { microExpenseOptions, movementTypes, type FinancialRecords, type Movement, type MovementDraft, type MovementPreset, type MovementType } from './model'
 
 const movementIcons = { gasto: ArrowUpRight, ingreso: ArrowDownLeft, transferencia: ArrowLeftRight }
 
-function MovementForm({ records, record, preset, busy, onSave, onCancel }: {
-  records: FinancialRecords; record: Movement | null; preset?: MovementPreset; busy: boolean;
+function MovementForm({ records, record, preset, busy, hidden, onSave, onCancel }: {
+  records: FinancialRecords; record: Movement | null; preset?: MovementPreset; busy: boolean; hidden: boolean;
   onSave: (draft: MovementDraft) => Promise<void>; onCancel: () => void
 }) {
   const activeAccounts = records.accounts.filter(account => account.status === 'activa')
@@ -22,8 +23,9 @@ function MovementForm({ records, record, preset, busy, onSave, onCancel }: {
   const [saveError, setSaveError] = useState('')
   const isTransfer = type === 'transferencia'
   const linked = Boolean(record?.commitmentId)
-  const categoryOptions = type === 'ingreso' ? incomeCategories : expenseCategories
-  const defaultCategory = record && record.type !== 'transferencia' && record.type === type ? record.categoryId : ''
+  const categoryOptions = useCategories(type === 'transferencia' ? undefined : type, true, record?.type !== 'transferencia' ? record?.categoryId : undefined)
+  const defaultCategory = record && record.type !== 'transferencia' && record.type === type ? record.categoryId :
+    categoryOptions.some(item => item.id === preset?.categoryId) ? preset?.categoryId : ''
 
   async function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()
@@ -68,7 +70,7 @@ function MovementForm({ records, record, preset, busy, onSave, onCancel }: {
           })}
         </div>
         <div className="grid gap-3 sm:grid-cols-2">
-          <Field label="Monto (CLP)" error={errors.amount}>{(id, attributes) => <Input id={id} name="amount" inputMode="numeric" maxLength={12} readOnly={linked} required placeholder="15000" defaultValue={record?.amount ?? preset?.amount} {...attributes} />}</Field>
+          <Field label="Monto (CLP)" error={errors.amount}>{(id, attributes) => <MoneyInput hidden={hidden} id={id} name="amount" inputMode="numeric" maxLength={12} readOnly={linked} required placeholder="15000" defaultValue={record?.amount ?? preset?.amount} {...attributes} />}</Field>
           <Field label="Fecha" error={errors.date}>{(id, attributes) => <Input id={id} name="date" type="date" defaultValue={record?.date ?? today} max={today} readOnly={linked} required {...attributes} />}</Field>
           <Field label={type === 'ingreso' ? 'Cuenta de destino' : 'Cuenta de origen'} error={errors.account}>{(id, attributes) => (
             <Select id={id} name="account" value={accountId} disabled={linked} onChange={event => {
@@ -115,8 +117,8 @@ function MovementForm({ records, record, preset, busy, onSave, onCancel }: {
   )
 }
 
-export function MovementDialog({ open, record, preset, onOpenChange, records, onSave, onCloseAutoFocus }: {
-  open: boolean; record: Movement | null; preset?: MovementPreset; onOpenChange: (value: boolean) => void; records: FinancialRecords;
+export function MovementDialog({ open, record, preset, hidden, onOpenChange, records, onSave, onCloseAutoFocus }: {
+  open: boolean; record: Movement | null; preset?: MovementPreset; hidden: boolean; onOpenChange: (value: boolean) => void; records: FinancialRecords;
   onSave: (draft: MovementDraft, id?: string) => Promise<void>; onCloseAutoFocus: (event: Event) => void
 }) {
   const locked = useRef(false)
@@ -140,7 +142,7 @@ export function MovementDialog({ open, record, preset, onOpenChange, records, on
       <DialogContent onCloseAutoFocus={onCloseAutoFocus} closeDisabled={busy} aria-busy={busy}>
         <DialogTitle className="panel-heading pr-7 font-sans text-xl">{record ? 'Editar movimiento' : 'Registrar movimiento'}</DialogTitle>
         <DialogDescription className="mt-1 text-sm text-muted-foreground">{record ? 'Actualiza los datos de esta operación.' : 'Agrega un gasto, un ingreso o una transferencia entre tus cuentas.'}</DialogDescription>
-        <MovementForm key={record?.id ?? 'new'} record={record} preset={preset} records={records} busy={busy} onSave={save} onCancel={() => onOpenChange(false)} />
+        <MovementForm key={record?.id ?? 'new'} record={record} preset={preset} records={records} busy={busy} hidden={hidden} onSave={save} onCancel={() => onOpenChange(false)} />
       </DialogContent>
     </Dialog>
   )

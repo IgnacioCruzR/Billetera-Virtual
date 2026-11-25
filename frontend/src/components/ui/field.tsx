@@ -8,6 +8,10 @@ export function Input({ className, ...props }: ComponentProps<'input'>) {
   return <input className={cn(control, className)} {...props} />
 }
 
+export function MoneyInput({ hidden, type = 'text', inputMode = 'numeric', ...props }: ComponentProps<'input'> & { hidden: boolean }) {
+  return <Input {...props} type={hidden ? 'password' : type} inputMode={inputMode} autoComplete={hidden ? 'off' : props.autoComplete} />
+}
+
 export function Select({ className, ...props }: ComponentProps<'select'>) {
   return (
     <span className="relative block min-w-0">
