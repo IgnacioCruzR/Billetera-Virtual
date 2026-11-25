@@ -26,17 +26,17 @@ export function BudgetPeriodFields({ month, year, onMonth, onYear, error }: {
   )
 }
 
-export function BudgetPeriodSelector({ period, onPeriod }: { period: BudgetPeriod; onPeriod: (value: BudgetPeriod) => void }) {
+export function BudgetPeriodSelector({ period, onPeriod, context = 'presupuestos' }: { period: BudgetPeriod; onPeriod: (value: BudgetPeriod) => void; context?: string }) {
   const [year, month] = period.split('-')
   const previous = shiftBudgetPeriod(period, -1)
   const next = shiftBudgetPeriod(period, 1)
   return (
-    <div className="flex w-full min-w-0 items-center gap-1.5 sm:w-auto" role="group" aria-label="Período de presupuestos">
+    <div className="flex w-full min-w-0 items-center gap-1.5 sm:w-auto" role="group" aria-label={`Período de ${context}`}>
       <Button variant="outline" size="icon" disabled={!previous} onClick={() => { if (previous) onPeriod(previous) }} aria-label="Mes anterior"><ChevronLeft aria-hidden="true" /></Button>
       <div className="min-w-0 flex-1 sm:w-34 sm:flex-none">
-        <Select aria-label="Mes de presupuestos" value={month} onChange={event => { const value = budgetPeriod(year, event.target.value); if (value) onPeriod(value) }}><MonthOptions /></Select>
+        <Select aria-label={`Mes de ${context}`} value={month} onChange={event => { const value = budgetPeriod(year, event.target.value); if (value) onPeriod(value) }}><MonthOptions /></Select>
       </div>
-      <Input key={year} className="w-16 text-center tabular-nums" aria-label="Año de presupuestos" inputMode="numeric" maxLength={4} defaultValue={year}
+      <Input key={year} className="w-16 text-center tabular-nums" aria-label={`Año de ${context}`} inputMode="numeric" maxLength={4} defaultValue={year}
         onBlur={event => {
           const value = budgetPeriod(event.target.value, month)
           if (value) onPeriod(value)

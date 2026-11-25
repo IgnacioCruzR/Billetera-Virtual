@@ -139,8 +139,9 @@ export function AccountStatusDialog({ action, account, records, hidden, onConfir
   action: 'archive' | 'reactivate' | 'delete'; account: Account; records: FinancialRecords; hidden: boolean; onConfirm: () => Promise<void>;
 }) {
   const submission = useDialogSubmission(onClose)
-  const refs = accountReferences(account.id)
-  const blocked = action === 'delete' ? deletionReasons(account, records) : []
+  const refs = accountReferences(account.id, records)
+  const hasReservations = action === 'archive' && refs.reserved > 0
+  const blocked = action === 'delete' ? deletionReasons(account, records) : hasReservations ? ['Libera las reservas de esta cuenta antes de archivarla.'] : []
   const config = {
     archive: { title: 'Archivar cuenta', description: `«${account.name}» conservará su saldo e historial. Reactívala para registrar nuevas operaciones.` },
     reactivate: { title: 'Reactivar cuenta', description: `«${account.name}» volverá a estar disponible en los selectores de movimientos.` },
@@ -158,7 +159,7 @@ export function AccountStatusDialog({ action, account, records, hidden, onConfir
             {refs.commitments > 0 && <li>Compromisos asociados: {refs.commitments}.</li>}
           </ul>
         )}
-        {blocked.length ? <><ul className="mt-3 list-disc space-y-1 pl-5 text-sm text-muted-foreground">{blocked.map(reason => <li key={reason}>{reason}</li>)}</ul><Button className="mt-4" variant="outline" onClick={submission.close}>Entendido</Button></>
+        {blocked.length ? <><ul className="mt-3 list-disc space-y-1 pl-5 text-sm text-muted-foreground">{blocked.map(reason => <li key={reason}>{reason}</li>)}</ul><div className="mt-4 flex flex-wrap gap-2"><Button variant="outline" onClick={submission.close}>Entendido</Button>{hasReservations && <Button asChild><a href={`#metas?cuenta=${encodeURIComponent(account.id)}`} onClick={submission.close}>Revisar reservas</a></Button>}</div></>
           : <form className="mt-4 space-y-3" onSubmit={event => { event.preventDefault(); void submission.run(onConfirm) }}>
             {submission.error && <p className="text-sm text-red-300" role="alert">{submission.error}</p>}
             <FormActions busy={submission.busy} label={config.title} onCancel={submission.close} destructive={action === 'delete'} />
@@ -177,6 +178,7 @@ export function AccountDetail({ account, records, detected, hidden, onHistory, o
   const recent = records.movements.filter(item => involvesAccount(item, account.id) && item.date >= from && item.date <= to)
     .sort((a, b) => b.date.localeCompare(a.date)).slice(0, 5)
   const adjustments = records.adjustments.filter(item => item.accountId === account.id && item.date >= from && item.date <= to)
+  const { reserved } = accountReferences(account.id, records)
   const columns = [
     { label: 'Ingresos', value: activity.income, color: 'text-emerald-300' }, { label: 'Gastos', value: activity.expense, color: 'text-red-300' },
     { label: 'Transferencias recibidas', value: activity.received, color: 'text-blue-300' }, { label: 'Transferencias enviadas', value: activity.sent, color: 'text-blue-300' },
@@ -193,6 +195,8 @@ export function AccountDetail({ account, records, detected, hidden, onHistory, o
         <dl className="mt-4 grid grid-cols-2 gap-3 rounded-xl border border-border bg-secondary p-4">
           <div><dt className="text-xs text-muted-foreground">Saldo actual</dt><dd className="mt-1 text-xl font-bold tabular-nums wrap-anywhere">{formatMoney(account.balance, hidden)}</dd></div>
           <div><dt className="text-xs text-muted-foreground">Saldo inicial</dt><dd className="mt-1 text-xl font-bold tabular-nums wrap-anywhere">{formatMoney(account.initialBalance, hidden)}</dd></div>
+          <div><dt className="text-xs text-muted-foreground">Reservado para metas</dt><dd className="mt-1 font-bold text-indigo-200 tabular-nums">{formatMoney(reserved, hidden)}</dd>{reserved > 0 && <a href={`#metas?cuenta=${encodeURIComponent(account.id)}`} onClick={onClose} className="mt-1 inline-block text-xs font-semibold text-indigo-200 hover:underline">Ver reservas de la cuenta</a>}</div>
+          <div><dt className="text-xs text-muted-foreground">Dinero libre</dt><dd className={cn('mt-1 font-bold tabular-nums', account.balance < reserved && 'text-red-300')}>{formatMoney(account.balance - reserved, hidden)}</dd></div>
         </dl>
         <div className="mt-5 flex flex-wrap items-center justify-between gap-2"><h2 className="font-bold">Actividad del período</h2><PeriodSelect period={period} onChange={setPeriod} label="Período del detalle" /></div>
         <dl className="mt-3 grid grid-cols-2 gap-2 sm:grid-cols-4">
@@ -200,7 +204,10 @@ export function AccountDetail({ account, records, detected, hidden, onHistory, o
         </dl>
         <div className="mt-5 rounded-xl border border-border p-3"><BalanceChartTitle /><AccountBalanceChart records={records} accountId={account.id} period={period} hidden={hidden} /></div>
         <section className="mt-5 rounded-xl border border-border" aria-label="Movimientos recientes">
-          <div className="flex flex-wrap items-center justify-between gap-2 border-b border-border px-4 py-2"><h2 className="font-bold">Movimientos recientes</h2><Button variant="outline" size="sm" onClick={onHistory}>Ver historial de la cuenta</Button></div>
+          <div className="flex flex-wrap items-center justify-between gap-2 border-b border-border px-4 py-2"><h2 className="font-bold">Movimientos recientes</h2><div className="flex flex-wrap gap-2">
+            <Button asChild variant="ghost" size="sm"><a href={`#hormiga?cuenta=${encodeURIComponent(account.id)}`} onClick={onClose}>Ver gastos hormiga de la cuenta</a></Button>
+            <Button variant="outline" size="sm" onClick={onHistory}>Ver historial de la cuenta</Button>
+          </div></div>
           {recent.length ? <TransactionHistory items={recent} accounts={records.accounts} detected={detected} hidden={hidden} /> : <p className="p-4 text-sm text-muted-foreground">La cuenta aún no registra movimientos en este período.</p>}
         </section>
         {adjustments.length > 0 && (

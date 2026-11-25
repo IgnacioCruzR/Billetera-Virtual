@@ -24,7 +24,7 @@ export function TransactionTypeBadge({ type }: { type: MovementType }) {
 
 const classificationTone: Record<MicroExpenseStatus, string> = {
   posible: 'bg-warning/12 text-amber-300', necesario: 'bg-accent text-foreground/90',
-  prescindible: 'bg-warning/12 text-amber-200', 'sin-clasificacion': 'text-muted-foreground',
+  prescindible: 'bg-primary/12 text-emerald-200', excluido: 'bg-accent text-muted-foreground', 'sin-clasificacion': 'text-muted-foreground',
 }
 
 export function MicroExpenseBadge({ status }: { status: MicroExpenseStatus }) {
@@ -58,7 +58,7 @@ function TransactionActions({ item, onAction }: { item: Movement; onAction: Tran
         <Button ref={trigger} variant="ghost" size="icon" className="size-8" aria-label={`Acciones de ${transactionDescription(item)}`}><Ellipsis aria-hidden="true" /></Button>
       </PopoverTrigger>
       <PopoverContent align="end" aria-label="Acciones del movimiento" className="w-40 p-1" onCloseAutoFocus={event => { if (selected.current) event.preventDefault() }}>
-        {actions.map(({ id, label, icon: Icon }) => (
+        {actions.filter(action => action.id !== 'delete' || !item.commitmentId).map(({ id, label, icon: Icon }) => (
           <PopoverClose asChild key={id}>
             <Button variant="ghost" className={cn('h-9 w-full justify-start px-2 font-medium', id === 'delete' && 'text-red-300 hover:bg-danger/10 hover:text-red-200')}
               onClick={() => { selected.current = true; onAction(id, item, trigger.current) }}>

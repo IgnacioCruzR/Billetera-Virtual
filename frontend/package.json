@@ -9,7 +9,7 @@
     "typecheck": "tsc --noEmit",
     "preview": "vite preview",
     "test": "npm run test:unit && playwright test",
-    "test:unit": "node --experimental-strip-types --test tests/budget-calculations.unit.ts"
+    "test:unit": "node --experimental-strip-types --test tests/budget-calculations.unit.ts tests/cash-flow.unit.ts tests/micro-expenses.unit.ts tests/savings.unit.ts"
   },
   "engines": {
     "node": ">=22.12.0"

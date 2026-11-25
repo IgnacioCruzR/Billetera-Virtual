@@ -37,8 +37,8 @@ const navigation = [
 ] as const
 
 export type NavigationItem = typeof navigation[number]['items'][number]['id']
-export type Section = 'dashboard' | 'compromisos' | 'hormiga' | 'salud'
-export type ApplicationPage = 'dashboard' | 'movimientos' | 'cuentas' | 'presupuestos'
+export type Section = 'dashboard' | 'salud'
+export type ApplicationPage = 'dashboard' | 'movimientos' | 'cuentas' | 'presupuestos' | 'compromisos' | 'hormiga' | 'metas'
 export type DashboardView = Exclude<NavigationItem, Section | ApplicationPage>
 export type AppNotification = { id: string; title: string; detail: string; section: NavigationItem }
 
@@ -158,7 +158,7 @@ export function RegisterButton({ onClick, className, disabled }: { onClick: () =
   return <Button className={cn('font-bold', className)} onClick={onClick} disabled={disabled}><Plus className="size-[18px]" aria-hidden="true" /> Registrar movimiento</Button>
 }
 
-export const pageTitles: Record<ApplicationPage, string> = { dashboard: 'Dashboard', movimientos: 'Movimientos', cuentas: 'Mis cuentas', presupuestos: 'Presupuestos' }
+export const pageTitles: Record<ApplicationPage, string> = { dashboard: 'Dashboard', movimientos: 'Movimientos', cuentas: 'Mis cuentas', presupuestos: 'Presupuestos', compromisos: 'Cobros y pagos', hormiga: 'Gastos hormiga', metas: 'Metas de ahorro' }
 
 export function Header({ active, onNavigate, period, onPeriod, onRegister, page, ready, alerts }: NavigationProps & {
   period: Period; onPeriod: (period: Period) => void; onRegister: () => void; page: ApplicationPage; ready: boolean; alerts: AppNotification[];
@@ -177,7 +177,7 @@ export function Header({ active, onNavigate, period, onPeriod, onRegister, page,
             {user.initials}
           </Button>
           {page !== 'movimientos' && <RegisterButton className="ml-1 hidden sm:inline-flex" onClick={onRegister} disabled={!ready} />}
-          {page === 'presupuestos' && <Button size="icon" className="size-9 sm:hidden" aria-label="Registrar movimiento" title="Registrar movimiento" onClick={onRegister} disabled={!ready}><Plus aria-hidden="true" /></Button>}
+          {(page === 'presupuestos' || page === 'compromisos' || page === 'hormiga' || page === 'metas') && <Button size="icon" className="size-9 sm:hidden" aria-label="Registrar movimiento" title="Registrar movimiento" onClick={onRegister} disabled={!ready}><Plus aria-hidden="true" /></Button>}
         </div>
       </div>
     </header>

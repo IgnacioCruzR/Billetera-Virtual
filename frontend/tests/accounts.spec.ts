@@ -133,7 +133,7 @@ test('protege fondos reservados, transfiere sin variar el total y registra un aj
   await expect(totals).toContainText('$2.486.300')
   await expect(totals).toContainText('$1.850.000')
   await expect(totals).toContainText('$1.234.400')
-  await expect(page.getByRole('region', { name: 'Gastos hormiga' })).toContainText('$42.500')
+  await expect(page.getByRole('region', { name: 'Gastos hormiga' })).toContainText('$45.200')
 })
 
 test('archiva con saldo y referencias, restaura los selectores y elimina solo cuentas elegibles', async ({ page }) => {

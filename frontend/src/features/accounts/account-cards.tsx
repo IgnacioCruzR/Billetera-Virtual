@@ -76,8 +76,8 @@ function AccountActions({ account, canTransfer, onAction, onMovement }: {
   )
 }
 
-export function AccountCard({ account, hidden, canTransfer, onAction, onMovement }: {
-  account: AccountWithBalance; hidden: boolean; canTransfer: boolean; onAction: AccountActionHandler; onMovement: AccountMovementHandler;
+export function AccountCard({ account, reserved, hidden, canTransfer, onAction, onMovement }: {
+  account: AccountWithBalance; reserved: number; hidden: boolean; canTransfer: boolean; onAction: AccountActionHandler; onMovement: AccountMovementHandler;
 }) {
   return (
     <article className="panel relative overflow-hidden px-4 pb-3 pt-4 sm:p-5" aria-label={account.name}>
@@ -95,6 +95,7 @@ export function AccountCard({ account, hidden, canTransfer, onAction, onMovement
         <div className="min-w-0">
           <p className="text-xs text-muted-foreground">Saldo actual</p>
           <p className={cn('mt-1 text-[clamp(1.25rem,2.2vw,1.7rem)] leading-tight font-bold tracking-tight tabular-nums wrap-anywhere', account.balance < 0 && 'text-red-300')}>{formatMoney(account.balance, hidden)}</p>
+          <p className="mt-2 text-xs text-muted-foreground">Reservado <strong className="text-indigo-200">{formatMoney(reserved, hidden)}</strong> · Libre <strong className={account.balance < reserved ? 'text-red-300' : 'text-foreground'}>{formatMoney(account.balance - reserved, hidden)}</strong></p>
         </div>
         {account.status === 'archivada' && <AccountStatusBadge status={account.status} />}
       </div>

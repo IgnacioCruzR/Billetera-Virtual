@@ -5,7 +5,10 @@ import {
 import { Button } from '@/components/ui/button'
 import { cn, formatDate, formatMoney } from '@/lib/utils'
 import { BudgetProgress, BudgetStatusBadge, categoryName, percentageLabel } from '@/features/budgets/budget-cards'
-import type { Commitment, Period } from './model'
+import { CommitmentAmount, CommitmentIcon, CommitmentStatusBadge, compactDate } from '@/features/commitments/commitment-list'
+import type { FinancialCommitment } from '@/features/commitments/commitment-model'
+import { GoalProgress, progressLabel } from '@/features/savings/savings-cards'
+import type { Period } from './model'
 import type { DashboardBudget, DashboardSnapshot } from './use-dashboard'
 
 const percentFormat = new Intl.NumberFormat('es-CL', { maximumFractionDigits: 1 })
@@ -15,7 +18,7 @@ export function SummaryCards({ snapshot, hidden }: { snapshot: DashboardSnapshot
     { title: 'Saldo actual', amount: snapshot.balance, change: snapshot.balanceVariation, comparison: 'vs. cierre anterior', icon: Wallet, color: 'bg-primary/12 text-emerald-300' },
     { title: 'Ingresos del período', amount: snapshot.income, change: snapshot.incomeVariation, comparison: 'vs. período anterior', icon: ArrowDownLeft, color: 'bg-primary/12 text-emerald-300' },
     { title: 'Gastos del período', amount: snapshot.expense, change: snapshot.expenseVariation, comparison: 'vs. período anterior', icon: ArrowUpRight, color: 'bg-amber-400/12 text-amber-300', invert: true },
-    { title: 'Saldo proyectado', amount: snapshot.projected, change: null, comparison: 'Cobros y pagos pendientes', icon: ChartNoAxesCombined, color: 'bg-blue-400/12 text-blue-300' },
+    { title: 'Saldo proyectado', amount: snapshot.projected, change: null, comparison: 'Cobros y pagos a 30 días', icon: ChartNoAxesCombined, color: 'bg-blue-400/12 text-blue-300' },
   ]
 
   return (
@@ -73,52 +76,44 @@ export function BudgetPanel({ budgets, hidden }: { budgets: DashboardBudget[]; h
   )
 }
 
-export function CommitmentsPanel({ commitments, hidden }: { commitments: Commitment[]; hidden: boolean }) {
+export function CommitmentsPanel({ commitments, today, hidden }: { commitments: FinancialCommitment[]; today: string; hidden: boolean }) {
   return (
-    <section id="compromisos" className="panel dashboard-anchor p-4 sm:p-5" aria-labelledby="compromisos-title">
-      <h2 id="compromisos-title" className="panel-heading flex items-center gap-2.5"><CalendarClock className="size-[18px] text-primary" aria-hidden="true" /> Próximos cobros y pagos</h2>
+    <section className="panel p-4 sm:p-5" aria-labelledby="compromisos-title">
+      <div className="flex flex-wrap items-center justify-between gap-2"><h2 id="compromisos-title" className="panel-heading flex items-center gap-2.5"><CalendarClock className="size-[18px] text-primary" aria-hidden="true" /> Próximos cobros y pagos</h2>
+        <a href="#compromisos" className="rounded-sm text-xs font-semibold text-emerald-300 hover:underline">Ver cobros y pagos</a></div>
       <p className="mt-1 text-sm text-muted-foreground">Compromisos pendientes</p>
-      <ul className="mt-3 divide-y divide-border">
-        {commitments.map(item => {
-          const incoming = item.type === 'cobro'
-          const near = item.daysUntil <= 5
-          const Icon = incoming ? ArrowDownLeft : ArrowUpRight
-          return (
-            <li key={item.id} className="grid grid-cols-[auto_minmax(0,1fr)_auto] items-center gap-2.5 py-3.5 sm:gap-3">
-              <span className={cn('grid size-9 place-items-center rounded-lg', incoming ? 'bg-primary/12 text-emerald-300' : 'bg-amber-400/10 text-amber-300')}><Icon className="size-[18px]" aria-hidden="true" /></span>
-              <div className="min-w-0">
-                <p className="text-sm leading-snug font-semibold">{item.description}</p>
-                <p className="mt-0.5 text-xs text-muted-foreground"><span className="capitalize">{item.type}</span> <span aria-hidden="true">·</span> <time dateTime={item.date}>{formatDate(item.date, { day: 'numeric', month: 'short' })}</time></p>
-              </div>
-              <div className="text-right">
-                <p className={cn('text-sm font-semibold tabular-nums', incoming && 'text-emerald-300')}>{incoming ? '+' : '−'}{formatMoney(item.amount, hidden)}</p>
-                <span className={cn('mt-0.5 inline-block text-xs', near ? 'text-amber-300' : 'text-muted-foreground')}>{near ? 'Por vencer' : 'Programado'}</span>
-              </div>
-            </li>
-          )
-        })}
-      </ul>
+      {commitments.length ? <ul className="mt-3 divide-y divide-border">
+        {commitments.slice(0, 4).map(item => <li key={item.id} className="flex flex-wrap items-center gap-2.5 py-3 sm:gap-3">
+          <CommitmentIcon type={item.type} />
+          <div className="min-w-0 flex-1">
+            <a href={`#compromisos?compromiso=${encodeURIComponent(item.id)}`} className="text-sm leading-snug font-semibold wrap-anywhere hover:underline">{item.name}</a>
+            <p className="mt-0.5 text-xs text-muted-foreground"><span className="capitalize">{item.type}</span> · <time dateTime={item.dueDate}>{compactDate(item.dueDate)}</time></p>
+          </div>
+          <div className="flex flex-col items-end gap-0.5"><CommitmentAmount type={item.type} amount={item.amount} hidden={hidden} /><CommitmentStatusBadge item={item} today={today} /></div>
+        </li>)}
+      </ul> : <p className="mt-4 text-sm text-muted-foreground">Aún no hay cobros ni pagos pendientes.</p>}
     </section>
   )
 }
 
 export function SmallExpensesPanel({ data, hidden }: { data: DashboardSnapshot['smallExpenses']; hidden: boolean }) {
   return (
-    <section id="hormiga" className="panel dashboard-anchor p-4 sm:p-5" aria-labelledby="hormiga-title">
-      <div className="flex items-start gap-3">
+    <section className="panel p-4 sm:p-5" aria-labelledby="hormiga-title">
+      <div className="flex flex-wrap items-start gap-3">
         <span className="grid size-9 shrink-0 place-items-center rounded-lg bg-warning/12 text-amber-300"><Coffee className="size-[18px]" aria-hidden="true" /></span>
-        <div>
+        <div className="flex-1">
           <h2 className="panel-heading" id="hormiga-title">Gastos hormiga</h2>
-          <p className="mt-0.5 text-sm text-muted-foreground">Gastos pequeños y frecuentes del mes</p>
+          <p className="mt-0.5 text-sm text-muted-foreground">Gastos pequeños identificados este mes</p>
         </div>
+        <a href="#hormiga" className="rounded-sm text-xs font-semibold text-emerald-300 hover:underline">Ver gastos hormiga</a>
       </div>
       <p className="money mt-4 text-[30px] text-amber-200">{formatMoney(data.amount, hidden)}</p>
-      <p className="mt-1 text-sm text-muted-foreground">{data.count} movimientos detectados</p>
+      <p className="mt-1 text-sm text-muted-foreground">{data.count} movimientos identificados · {data.pendingCount} por revisar</p>
       <div className="mt-4 flex flex-wrap items-center justify-between gap-2 rounded-lg border border-border bg-secondary/70 px-3 py-2.5 text-sm">
         <span className="text-muted-foreground">Proyección anual</span>
-        <span className="font-semibold tabular-nums">{formatMoney(data.amount * 12, hidden)}</span>
+        <span className="font-semibold tabular-nums">{data.annualEstimate === null ? 'Datos insuficientes' : formatMoney(data.annualEstimate, hidden)}</span>
       </div>
-      <p className="mt-3 text-sm leading-relaxed text-muted-foreground">El cálculo anual supone que mantienes este nivel de gasto cada mes.</p>
+      {data.annualEstimate !== null && <p className="mt-3 text-sm leading-relaxed text-muted-foreground">Estimación según el ritmo mensual registrado.</p>}
     </section>
   )
 }
@@ -149,15 +144,32 @@ export function FinancialHealthPanel({ data }: { data: DashboardSnapshot['health
   )
 }
 
+export function DashboardSavingsPanel({ data, shortfall, hidden }: { data: DashboardSnapshot['savings']; shortfall: boolean; hidden: boolean }) {
+  return <section className="panel p-4 sm:p-5" aria-label="Resumen de metas de ahorro">
+    <div className="flex flex-wrap items-center justify-between gap-2"><h2 className="panel-heading flex items-center gap-2.5"><PiggyBank className="size-[18px] text-indigo-300" aria-hidden="true" />Metas de ahorro</h2><a href="#metas" className="text-xs font-semibold text-emerald-300 hover:underline">Ver metas de ahorro</a></div>
+    <div className="mt-3 grid gap-2.5 sm:grid-cols-3">
+      <div><p className="text-xs text-muted-foreground">Dinero reservado</p><p className="mt-0.5 text-lg font-bold text-indigo-200 tabular-nums">{formatMoney(data.reserved, hidden)}</p></div>
+      <div><p className="text-xs text-muted-foreground">Dinero libre</p><p className="mt-0.5 text-lg font-bold tabular-nums">{formatMoney(data.free, hidden)}</p></div>
+      <div><p className="text-xs text-muted-foreground">Progreso de metas en curso</p><p className="mt-0.5 text-sm font-semibold">{data.progress === null ? 'Sin metas en progreso' : progressLabel(data.progress)}</p><div className="mt-1.5"><GoalProgress value={data.progress ?? 0} label="Progreso global de ahorro" color="var(--reserve)" /></div></div>
+    </div>
+    <p className="mt-3 text-xs text-muted-foreground">{shortfall ? 'Revisa los próximos pagos antes de reservar más dinero.' : data.activeCount > 0 ? 'Consulta tus metas para ajustar el plan según tu dinero libre.' : 'Puedes crear una meta y definir cuándo te gustaría alcanzarla.'}</p>
+  </section>
+}
+
 export function Recommendations({ data, period, hidden, onAssistant }: { data: DashboardSnapshot; period: Period; hidden: boolean; onAssistant: () => void }) {
-  const payment = data.commitments.find(item => item.type === 'pago')
+  const payment = data.commitments.find(item => item.type === 'pago' && item.dueDate >= data.today)
+  const overdue = data.commitments.filter(item => item.dueDate < data.today).length
+  const paymentInsight = data.projection.firstDeficit
+    ? { title: 'Posible déficit', text: `Revisa los vencimientos del ${compactDate(data.projection.firstDeficit)} para anticipar el faltante.` }
+    : overdue ? { title: 'Vencimientos pendientes', text: `Revisa los compromisos vencidos (${overdue}) y confirma o reprograma según corresponda.` }
+    : { title: 'Próximo pago', text: payment ? `Revisa si puedes cubrir ${payment.name} el ${compactDate(payment.dueDate)}.` : 'Estás al día con tus próximos pagos.' }
   const variance = data.expenseVariation
   const ExpenseTrend = (variance ?? 0) <= 0 ? ArrowDownRight : ArrowUpRight
   const comparison = period === 'month' ? 'el mes anterior' : 'el período anterior'
   const insights = [
     { icon: ExpenseTrend, title: 'Variación de gastos', text: variance === null ? 'Registra gastos en ambos períodos para comparar.' : variance === 0 ? `Tus gastos se mantuvieron respecto a ${comparison}.` : `Tus gastos ${variance < 0 ? 'bajaron' : 'subieron'} ${percentFormat.format(Math.abs(variance))}% respecto a ${comparison}.` },
-    { icon: PiggyBank, title: 'Gastos pequeños', text: `Llevas ${formatMoney(data.smallExpenses.amount, hidden)} en gastos hormiga este mes.` },
-    { icon: CalendarClock, title: 'Pago próximo', text: payment ? `Tienes un pago de ${payment.description.toLocaleLowerCase('es-CL')} en ${payment.daysUntil} días.` : 'Estás al día con tus próximos pagos.' },
+    { icon: PiggyBank, title: 'Gastos pequeños', text: data.smallExpenses.pendingCount ? `Revisa los gastos pequeños pendientes de clasificación (${data.smallExpenses.pendingCount}) en Gastos hormiga.` : data.smallExpenses.count ? `Llevas ${formatMoney(data.smallExpenses.amount, hidden)} en gastos pequeños revisados este mes.` : 'Consulta Gastos hormiga para revisar los pequeños gastos del mes.' },
+    { icon: CalendarClock, ...paymentInsight },
   ]
 
   return (

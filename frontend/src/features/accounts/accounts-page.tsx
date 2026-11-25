@@ -9,7 +9,8 @@ import { cn, formatMoney } from '@/lib/utils'
 import { balanceOn, summarizeAccounts, type AccountSummary, type AccountWithBalance } from './account-balances'
 import { AccountCard, AccountQuickActions, type AccountActionHandler, type AccountMovementHandler } from './account-cards'
 import { AccountBalanceChart, AccountDistributionChart, BalanceChartTitle } from './account-charts'
-import { totalReserved, type useFinancialRecords } from './account-data'
+import type { useFinancialRecords } from './account-data'
+import { reservedAt } from '@/features/savings/savings-ledger'
 import { AccountAdjustmentDialog, AccountDetail, AccountFormDialog, AccountStatusDialog } from './account-dialogs'
 
 function AccountSummaryPanel({ summary, hidden, onMovement }: { summary: AccountSummary; hidden: boolean; onMovement: AccountMovementHandler }) {
@@ -43,9 +44,10 @@ function AccountSummaryPanel({ summary, hidden, onMovement }: { summary: Account
 
 type Modal = { type: 'create' } | { type: 'edit' | 'detail' | 'archive' | 'reactivate' | 'delete' | 'adjust'; id: string }
 
-export function AccountsPage({ finance, detected, hidden, onTogglePrivacy, onMovement, onHistory, onToast }: {
+export function AccountsPage({ finance, detected, hidden, onTogglePrivacy, onMovement, onHistory, onToast, initialAccountId, onClearInitial }: {
   finance: ReturnType<typeof useFinancialRecords>; detected: ReadonlySet<string>; hidden: boolean;
   onTogglePrivacy: () => void; onMovement: AccountMovementHandler; onHistory: (id: string) => void; onToast: (message: string) => void;
+  initialAccountId?: string; onClearInitial: () => void;
 }) {
   const [tab, setTab] = useState<'activa' | 'archivada'>('activa')
   const [period, setPeriod] = useState<Period>('month')
@@ -54,10 +56,11 @@ export function AccountsPage({ finance, detected, hidden, onTogglePrivacy, onMov
   const [source, setSource] = useState<HTMLElement | null>(null)
   const { records, status } = finance
   const accounts: AccountWithBalance[] = records.accounts.map(account => ({ ...account, balance: balanceOn(account, records, today) }))
-  const summary = summarizeAccounts(accounts, totalReserved)
+  const summary = summarizeAccounts(accounts, reservedAt(records, today))
   const archivedCount = accounts.length - summary.activeCount
   const visible = accounts.filter(account => account.status === tab)
-  const selected = modal && 'id' in modal ? accounts.find(item => item.id === modal.id) : undefined
+  const currentModal = modal ?? (initialAccountId ? { type: 'detail' as const, id: initialAccountId } : null)
+  const selected = currentModal && 'id' in currentModal ? accounts.find(item => item.id === currentModal.id) : undefined
   const effectiveChartAccount = accounts.some(item => item.id === chartAccount) ? chartAccount : ''
 
   function create(trigger: HTMLElement) {
@@ -71,7 +74,7 @@ export function AccountsPage({ finance, detected, hidden, onTogglePrivacy, onMov
     setModal({ type, id: account.id })
   }
 
-  function close() { setModal(null) }
+  function close() { setModal(null); if (initialAccountId) onClearInitial() }
   function restore(event: Event) {
     event.preventDefault()
     if (source?.isConnected) source.focus({ preventScroll: true })
@@ -108,7 +111,7 @@ export function AccountsPage({ finance, detected, hidden, onTogglePrivacy, onMov
             </div>
             {visible.length ? (
               <div className="grid gap-3.5 sm:grid-cols-2 xl:grid-cols-3 min-[1660px]:grid-cols-4">
-                {visible.map(account => <AccountCard account={account} hidden={hidden} key={account.id} onAction={onAction} onMovement={onMovement} canTransfer={summary.activeCount > 1} />)}
+                {visible.map(account => <AccountCard account={account} reserved={reservedAt(records, today, account.id)} hidden={hidden} key={account.id} onAction={onAction} onMovement={onMovement} canTransfer={summary.activeCount > 1} />)}
               </div>
             ) : (
               <div className="panel px-4 py-8 text-center">
@@ -141,7 +144,8 @@ export function AccountsPage({ finance, detected, hidden, onTogglePrivacy, onMov
           onToast(id ? 'Cuenta actualizada.' : 'Cuenta creada.')
         }} />
       )}
-      {modal?.type === 'detail' && selected && <AccountDetail account={selected} records={records} detected={detected} hidden={hidden} onClose={close} onCloseAutoFocus={restore} onHistory={() => { close(); onHistory(selected.id) }} />}
+      {currentModal?.type === 'detail' && selected && <AccountDetail account={selected} records={records} detected={detected} hidden={hidden} onClose={close} onCloseAutoFocus={restore} onHistory={() => { close(); onHistory(selected.id) }} />}
+      {initialAccountId && status === 'ready' && !selected && <div role="alert" className="panel p-3">La cuenta solicitada ya no está disponible. <Button variant="ghost" onClick={close}>Cerrar</Button></div>}
       {modal?.type === 'adjust' && selected && <AccountAdjustmentDialog account={selected} records={records} hidden={hidden} onClose={close} onCloseAutoFocus={restore} onSave={async draft => { await finance.adjustAccount(draft); onToast('Ajuste registrado.') }} />}
       {selected && (modal?.type === 'archive' || modal?.type === 'reactivate' || modal?.type === 'delete') && (
         <AccountStatusDialog account={selected} action={modal.type} records={records} hidden={hidden} onClose={close} onCloseAutoFocus={restore} onConfirm={async () => {

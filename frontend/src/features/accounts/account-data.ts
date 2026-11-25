@@ -1,27 +1,34 @@
 import { useEffect, useState } from 'react'
-import { accounts, commitments, expenseCategories, goals, reservedForAccount, seedBudgets, seedMovements, today } from '@/features/dashboard/mock-data'
+import { accounts, expenseCategories, incomeCategories, refreshFinancialDate, seedBudgets, seedCommitments, seedMovements, seedReservations, seedSavingsGoals, today, user } from '@/features/dashboard/mock-data'
+import { cancelCommitment, confirmCommitment, validateCommitment } from '@/features/commitments/commitment-records'
+import type { CommitmentConfirmation, CommitmentFormData, FinancialCommitment } from '@/features/commitments/commitment-model'
 import { budgetPhase, conflictingBudgets, parseBudgetPeriod, validateBudget } from '@/features/budgets/budget-calculations'
 import type { BudgetFormData, BudgetPeriod } from '@/features/budgets/budget-model'
 import { accountTypes, type Account, type AccountFormData, type AccountStatus, type FinancialRecords, type MovementDraft } from '@/features/dashboard/model'
 import { isIsoDate, maximumMovementAmount, validateMovement } from '@/features/movements/movement-data'
 import { balanceOn } from './account-balances'
+import { classificationOptions, type MicroExpenseClassification } from '@/features/micro-expenses/micro-expense-model'
+import { reservedAt, worsensReservation } from '@/features/savings/savings-ledger'
+import { changeGoalStatus, recordReservation, reservedFundsError, saveSavingsGoal, type LifecycleAction } from '@/features/savings/savings-records'
+import type { SavingsContribution, SavingsGoalFormData, SavingsReservationType } from '@/features/savings/savings-model'
 
 export const accountTypeLabel = (type: Account['type']) => accountTypes.find(item => item.id === type)!.label
-export const totalReserved = goals.length ? goals.reduce((sum, goal) => sum + goal.saved, 0) : null
 
-export function accountReferences(id: string) {
+export function accountReferences(id: string, records: FinancialRecords) {
   return {
-    reserved: reservedForAccount(id),
-    commitments: commitments.filter(item => item.accountId === id).length,
+    reserved: reservedAt(records, today, id),
+    hasReservationHistory: records.reservations.some(item => item.accountId === id),
+    commitments: records.commitments.filter(item => item.accountId === id).length,
   }
 }
 
 export function deletionReasons(account: Account, records: FinancialRecords) {
-  const references = accountReferences(account.id)
+  const references = accountReferences(account.id, records)
   return [
     balanceOn(account, records, today) !== 0 && 'Debe tener saldo de $0.',
     records.usedAccountIds.has(account.id) && 'Tiene movimientos, transferencias o ajustes registrados en su historial.',
     references.reserved > 0 && 'Tiene fondos reservados para metas de ahorro.',
+    references.reserved === 0 && references.hasReservationHistory && 'Tiene operaciones de reserva en su historial.',
     references.commitments > 0 && 'Tiene compromisos asociados.',
   ].filter((reason): reason is string => Boolean(reason))
 }
@@ -62,6 +69,7 @@ export interface FinancialRepository {
   list(): Promise<FinancialRecords>
   saveMovement(draft: MovementDraft, id?: string): Promise<FinancialRecords>
   removeMovement(id: string): Promise<FinancialRecords>
+  classifyExpenses(ids: string[], classification: MicroExpenseClassification): Promise<FinancialRecords>
   saveAccount(draft: AccountFormData, id?: string): Promise<FinancialRecords>
   setAccountStatus(id: string, status: AccountStatus): Promise<FinancialRecords>
   removeAccount(id: string): Promise<FinancialRecords>
@@ -69,9 +77,15 @@ export interface FinancialRepository {
   saveBudget(draft: BudgetFormData, id?: string): Promise<FinancialRecords>
   removeBudget(id: string): Promise<FinancialRecords>
   duplicateBudgets(ids: string[], period: BudgetPeriod): Promise<FinancialRecords>
+  saveCommitment(draft: CommitmentFormData, id?: string): Promise<FinancialRecords>
+  confirmCommitment(id: string, draft: CommitmentConfirmation): Promise<FinancialRecords>
+  cancelCommitment(id: string): Promise<FinancialRecords>
+  saveGoal(draft: SavingsGoalFormData, id?: string, initial?: Pick<SavingsContribution, 'accountId' | 'amount'>): Promise<FinancialRecords>
+  recordReservation(type: SavingsReservationType, draft: SavingsContribution): Promise<FinancialRecords>
+  changeGoalStatus(id: string, action: LifecycleAction): Promise<FinancialRecords>
 }
 
-const emptyRecords: FinancialRecords = { accounts: [], movements: [], budgets: [], adjustments: [], usedAccountIds: new Set() }
+const emptyRecords: FinancialRecords = { accounts: [], movements: [], budgets: [], commitments: [], adjustments: [], savingsGoals: [], reservations: [], usedAccountIds: new Set() }
 const expenseIds = expenseCategories.map(category => category.id)
 const wait = () => new Promise<void>(resolve => setTimeout(resolve, 180))
 
@@ -84,7 +98,7 @@ function rememberAccounts(ids: ReadonlySet<string>, item: MovementDraft) {
 
 const mockRepository: FinancialRepository = (() => {
   let records: FinancialRecords = {
-    ...emptyRecords, accounts, movements: seedMovements, budgets: seedBudgets,
+    ...emptyRecords, accounts, movements: seedMovements, budgets: seedBudgets, commitments: seedCommitments, savingsGoals: seedSavingsGoals, reservations: seedReservations,
     usedAccountIds: seedMovements.reduce((ids, item) => rememberAccounts(ids, item), new Set<string>()),
   }
 
@@ -96,25 +110,43 @@ const mockRepository: FinancialRepository = (() => {
 
   async function update(change: (current: FinancialRecords) => FinancialRecords) {
     await wait()
+    refreshFinancialDate()
     records = change(records)
     return records
   }
+  const savingsContext = () => ({ today, now: new Date().toISOString(), id: () => crypto.randomUUID() })
 
   return {
     async list() { await wait(); return records },
     saveMovement: (draft, id) => update(current => {
-      if (id && !current.movements.some(item => item.id === id)) throw new Error('El movimiento ya no está disponible.')
+      const existing = current.movements.find(item => item.id === id)
+      if (id && !existing) throw new Error('El movimiento ya no está disponible.')
+      if (existing?.commitmentId && (draft.date !== existing.date || draft.amount !== existing.amount || draft.accountId !== existing.accountId || draft.type !== existing.type)) {
+        throw new Error('El movimiento está vinculado a un compromiso confirmado. Conserva su tipo, fecha, monto y cuenta.')
+      }
       const error = Object.values(validateMovement(draft, current, id))[0]
       if (error) throw new Error(error)
-      const movement = { ...draft, id: id ?? crypto.randomUUID() }
+      const movement = { ...draft, id: id ?? crypto.randomUUID(), ...(existing?.commitmentId ? { commitmentId: existing.commitmentId } : {}) }
       return {
         ...current, usedAccountIds: rememberAccounts(current.usedAccountIds, movement),
         movements: id ? current.movements.map(item => item.id === id ? movement : item) : [movement, ...current.movements],
       }
     }),
     removeMovement: id => update(current => {
-      if (!current.movements.some(item => item.id === id)) throw new Error('El movimiento ya no está disponible.')
-      return { ...current, movements: current.movements.filter(item => item.id !== id) }
+      const existing = current.movements.find(item => item.id === id)
+      if (!existing) throw new Error('El movimiento ya no está disponible.')
+      if (existing.commitmentId) throw new Error('Revisa el compromiso asociado antes de corregir esta operación confirmada.')
+      const next = { ...current, movements: current.movements.filter(item => item.id !== id) }
+      if (worsensReservation(current, next, existing.date, today)) throw new Error(reservedFundsError)
+      return next
+    }),
+    classifyExpenses: (ids, classification) => update(current => {
+      const unique = new Set(ids)
+      if (!unique.size || !classificationOptions.some(option => option.id === classification)
+          || current.movements.filter(item => unique.has(item.id) && item.type === 'gasto').length !== unique.size) {
+        throw new Error('La selección cambió. Vuelve a seleccionar los gastos que quieras clasificar.')
+      }
+      return { ...current, movements: current.movements.map(item => item.type === 'gasto' && unique.has(item.id) ? { ...item, classification } : item) }
     }),
     saveAccount: (draft, id) => update(current => {
       const existing = id ? findAccount(id) : null
@@ -127,6 +159,7 @@ const mockRepository: FinancialRepository = (() => {
     }),
     setAccountStatus: (id, status) => update(current => {
       const account = findAccount(id)
+      if (status === 'archivada' && reservedAt(current, today, id) > 0) throw new Error('Libera las reservas de esta cuenta antes de archivarla.')
       return { ...current, accounts: current.accounts.map(item => item.id === id ? { ...account, status } : item) }
     }),
     removeAccount: id => update(current => {
@@ -172,6 +205,25 @@ const mockRepository: FinancialRepository = (() => {
       const copies = sources.map(item => ({ ...item, period, id: crypto.randomUUID() }))
       return { ...current, budgets: [...current.budgets, ...copies] }
     }),
+    saveCommitment: (draft, id) => update(current => {
+      const existing = current.commitments.find(item => item.id === id)
+      if (id && (!existing || existing.status !== 'pendiente')) throw new Error('Solo se pueden editar compromisos pendientes.')
+      if (existing && existing.type !== draft.type) throw new Error('El tipo de un compromiso existente se conserva.')
+      const allowed = draft.type === 'cobro' ? incomeCategories : expenseCategories
+      const errors = validateCommitment(draft, current.accounts, allowed.map(item => item.id), today, maximumMovementAmount, existing)
+      const error = Object.values(errors)[0]
+      if (error) throw new Error(error)
+      const form = { ...draft, name: draft.name.trim(), notes: draft.notes.trim() }
+      const commitment: FinancialCommitment = existing
+        ? { ...existing, ...form, status: 'pendiente', originalDueDate: existing.originalDueDate ?? (existing.dueDate === draft.dueDate ? undefined : existing.dueDate) }
+        : { ...form, id: crypto.randomUUID(), status: 'pendiente', userId: user.id, currency: 'CLP', createdAt: new Date().toISOString() }
+      return { ...current, commitments: id ? current.commitments.map(item => item.id === id ? commitment : item) : [commitment, ...current.commitments] }
+    }),
+    confirmCommitment: (id, draft) => update(current => confirmCommitment(current, id, draft, today, new Date().toISOString(), () => crypto.randomUUID())),
+    cancelCommitment: id => update(current => cancelCommitment(current, id, today, new Date().toISOString())),
+    saveGoal: (draft, id, initial) => update(current => saveSavingsGoal(current, draft, savingsContext(), user.id, id, initial)),
+    recordReservation: (type, draft) => update(current => recordReservation(current, type, draft, savingsContext())),
+    changeGoalStatus: (id, action) => update(current => changeGoalStatus(current, id, action, savingsContext())),
   }
 })()
 
@@ -197,6 +249,7 @@ export function useFinancialRecords(repository = mockRepository) {
     reload() { setStatus('loading'); setAttempt(count => count + 1) },
     saveMovement: (draft: MovementDraft, id?: string) => apply(repository.saveMovement(draft, id)),
     removeMovement: (id: string) => apply(repository.removeMovement(id)),
+    classifyExpenses: (ids: string[], classification: MicroExpenseClassification) => apply(repository.classifyExpenses(ids, classification)),
     saveAccount: (draft: AccountFormData, id?: string) => apply(repository.saveAccount(draft, id)),
     setAccountStatus: (id: string, status: AccountStatus) => apply(repository.setAccountStatus(id, status)),
     removeAccount: (id: string) => apply(repository.removeAccount(id)),
@@ -204,5 +257,11 @@ export function useFinancialRecords(repository = mockRepository) {
     saveBudget: (draft: BudgetFormData, id?: string) => apply(repository.saveBudget(draft, id)),
     removeBudget: (id: string) => apply(repository.removeBudget(id)),
     duplicateBudgets: (ids: string[], period: BudgetPeriod) => apply(repository.duplicateBudgets(ids, period)),
+    saveCommitment: (draft: CommitmentFormData, id?: string) => apply(repository.saveCommitment(draft, id)),
+    confirmCommitment: (id: string, draft: CommitmentConfirmation) => apply(repository.confirmCommitment(id, draft)),
+    cancelCommitment: (id: string) => apply(repository.cancelCommitment(id)),
+    saveGoal: (draft: SavingsGoalFormData, id?: string, initial?: Pick<SavingsContribution, 'accountId' | 'amount'>) => apply(repository.saveGoal(draft, id, initial)),
+    recordReservation: (type: SavingsReservationType, draft: SavingsContribution) => apply(repository.recordReservation(type, draft)),
+    changeGoalStatus: (id: string, action: LifecycleAction) => apply(repository.changeGoalStatus(id, action)),
   }
 }

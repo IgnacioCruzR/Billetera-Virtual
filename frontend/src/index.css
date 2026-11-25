@@ -17,6 +17,7 @@
   --color-danger: var(--danger);
   --color-budget-limit: var(--budget-limit);
   --color-budget-time: var(--budget-time);
+  --color-reserve: var(--reserve);
 }
 
 :root {
@@ -35,6 +36,7 @@
   --danger: #ef4444;
   --budget-limit: #fb923c;
   --budget-time: #60a5fa;
+  --reserve: #818cf8;
   --sidebar-width: 14.25rem;
 }
 

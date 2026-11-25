@@ -1,15 +1,14 @@
-import { expenseCategories, incomeCategories, monthAt, reservedForAccount, shiftDays, today } from '@/features/dashboard/mock-data'
-import { balanceOn } from '@/features/accounts/account-balances'
-import type { FinancialRecords, MicroExpenseCriteria, MicroExpenseStatus, Movement, MovementDraft, Period } from '@/features/dashboard/model'
+import { expenseCategories, incomeCategories, monthAt, shiftDays, today } from '@/features/dashboard/mock-data'
+import { movementCapacity, worsensReservation } from '@/features/savings/savings-ledger'
+import { reservedFundsError } from '@/features/savings/savings-records'
+import type { FinancialRecords, Movement, MovementDraft, Period } from '@/features/dashboard/model'
+import { isIsoDate } from '@/lib/calendar'
+
+export { isIsoDate }
+export { classificationOf } from '@/features/micro-expenses/micro-expense-detection'
 
 export const maximumMovementAmount = 999_999_999_999
 export const categories = [...expenseCategories, ...incomeCategories]
-
-export function isIsoDate(date: string) {
-  if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) return false
-  const parsed = new Date(`${date}T00:00:00Z`)
-  return Number.isFinite(parsed.getTime()) && parsed.toISOString().slice(0, 10) === date
-}
 
 type Field = 'amount' | 'account' | 'destination' | 'category' | 'date'
 
@@ -35,13 +34,19 @@ export function validateMovement(draft: MovementDraft, records: FinancialRecords
     errors.date = 'La fecha debe ser igual o posterior a la apertura de las cuentas.'
   }
   if (draft.type === 'transferencia' && account && destination && !errors.destination && !errors.date && !errors.amount) {
-    const reserved = reservedForAccount(account.id)
-    const balance = Math.min(balanceOn(account, records, draft.date, editingId), balanceOn(account, records, today, editingId))
-    if (draft.amount > balance - reserved) {
-      errors.amount = reserved > 0
+    const { limit, hasReservations } = movementCapacity(records, account, draft.date, today, true, editingId)
+    if (draft.amount > limit) {
+      errors.amount = hasReservations
         ? 'Saldo disponible insuficiente. Los fondos reservados requieren liberación previa.'
         : 'Saldo disponible insuficiente en la cuenta de origen.'
     }
+  }
+  if (!Object.keys(errors).length && (editingId || draft.type === 'gasto')) {
+    const existing = records.movements.find(item => item.id === editingId)
+    const from = existing && existing.date < draft.date ? existing.date : draft.date
+    const next = { id: editingId ?? '', ...draft }
+    const movements = editingId ? records.movements.map(item => item.id === editingId ? next : item) : [...records.movements, next]
+    if (worsensReservation(records, { ...records, movements }, from, today)) errors.amount = reservedFundsError
   }
   return errors
 }
@@ -68,23 +73,5 @@ export function totals(movements: Movement[]) {
     if (movement.type === 'gasto') expense += movement.amount
   }
   return { income, expense, net: income - expense }
-}
-
-export function detectMicroExpenses(movements: Movement[], criteria: MicroExpenseCriteria) {
-  const groups = new Map<string, string[]>()
-  for (const item of movements) {
-    if (item.type !== 'gasto' || item.classification === 'necesario' || item.amount > criteria.maximumAmount) continue
-    const key = `${item.date.slice(0, 7)}:${item.categoryId}`
-    const group = groups.get(key) ?? []
-    group.push(item.id)
-    groups.set(key, group)
-  }
-  return new Set(Array.from(groups.values()).filter(group => group.length >= criteria.minimumCount).flat())
-}
-
-export function classificationOf(movement: Movement, detected: ReadonlySet<string>): MicroExpenseStatus {
-  if (movement.type !== 'gasto') return 'sin-clasificacion'
-  if (movement.classification !== 'automatica') return movement.classification
-  return detected.has(movement.id) ? 'posible' : 'sin-clasificacion'
 }
 

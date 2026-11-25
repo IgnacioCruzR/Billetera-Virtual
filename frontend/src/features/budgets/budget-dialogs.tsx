@@ -7,6 +7,7 @@ import { useDialogSubmission } from '@/components/ui/use-dialog-submission'
 import { expenseCategories, today } from '@/features/dashboard/mock-data'
 import type { FinancialRecords } from '@/features/dashboard/model'
 import { TransactionHistory } from '@/features/movements/transaction-history'
+import { isAnalyzed, microExpenseHistory } from '@/features/micro-expenses/micro-expense-detection'
 import { cn, formatMoney } from '@/lib/utils'
 import { budgetPeriod, budgetPhase, budgetStatus, conflictingBudgets, DEFAULT_WARNING_THRESHOLD, expensesInBudgetPeriod, parseBudgetPeriod, shiftBudgetPeriod, validateBudget, type BudgetView } from './budget-calculations'
 import { BudgetCategoryIcon, BudgetProgress, BudgetStatusBadge, categoryName, percentageLabel, riskLabels } from './budget-cards'
@@ -155,6 +156,8 @@ export function BudgetDetailDrawer({ budget, records, detected, hidden, onHistor
     { label: 'Margen diario recomendado', value: money(dailyMargin) },
   ]
   const recent = [...expenses].sort((a, b) => b.date.localeCompare(a.date)).slice(0, 5)
+  const smallExpenses = expenses.filter(item => isAnalyzed(microExpenseHistory(item, detected)))
+  const smallTotal = smallExpenses.reduce((sum, item) => sum + item.amount, 0)
   return (
     <Dialog open onOpenChange={open => { if (!open) onClose() }}>
       <DialogContent onCloseAutoFocus={onCloseAutoFocus} className="h-dvh max-h-none w-full max-w-4xl rounded-none border-y-0 border-r-0" style={{ top: 0, left: 'auto', right: 0, translate: 'none' }}>
@@ -186,6 +189,10 @@ export function BudgetDetailDrawer({ budget, records, detected, hidden, onHistor
         </section>}
         <section className="mt-4 rounded-xl border border-border" aria-label="Gastos asociados">
           <div className="flex flex-wrap items-center justify-between gap-2 border-b border-border p-3"><h3 className="font-bold">Gastos asociados</h3><Button variant="outline" size="sm" onClick={onHistory}>Ver gastos del presupuesto</Button></div>
+          {phase !== 'future' && <div className="flex flex-wrap items-center justify-between gap-2 border-b border-border p-3 text-sm">
+            <span>Gastos hormiga de la categoría · <strong>{money(smallTotal)}</strong>{budget.used > 0 && ` · ${percentageLabel(smallTotal / budget.used * 100)} del gasto efectivo`}</span>
+            <Button asChild variant="ghost" size="sm"><a href={`#hormiga?${new URLSearchParams({ categoria: budget.categoryId, mes: budget.period })}`} onClick={onClose}>Ver análisis de la categoría</a></Button>
+          </div>}
           {recent.length ? <TransactionHistory items={recent} accounts={records.accounts} detected={detected} hidden={hidden} /> : <p className="p-3 text-sm text-muted-foreground">Esta categoría aún no registra gastos para este mes.</p>}
         </section>
       </DialogContent>

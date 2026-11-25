@@ -10,8 +10,8 @@ import { MicroExpenseBadge, TransactionAmount, TransactionIcon, TransactionTypeB
 
 type DialogProps = { item: Movement; onClose: () => void; onCloseAutoFocus: (event: Event) => void }
 
-export function TransactionDetailDrawer({ item, accounts, detected, hidden, onClose, onCloseAutoFocus }: DialogProps & {
-  accounts: Account[]; detected: ReadonlySet<string>; hidden: boolean;
+export function TransactionDetailDrawer({ item, accounts, detected, hidden, onClose, onCloseAutoFocus, onCommitment }: DialogProps & {
+  accounts: Account[]; detected: ReadonlySet<string>; hidden: boolean; onCommitment: (id: string) => void;
 }) {
   return (
     <Dialog open onOpenChange={open => { if (!open) onClose() }}>
@@ -30,6 +30,7 @@ export function TransactionDetailDrawer({ item, accounts, detected, hidden, onCl
           {item.type === 'gasto' && <div><dt>Clasificación</dt><dd><MicroExpenseBadge status={classificationOf(item, detected)} /></dd></div>}
           <div><dt>Moneda</dt><dd>CLP</dd></div>
         </dl>
+        {item.commitmentId && <Button variant="outline" className="mt-4" onClick={() => onCommitment(item.commitmentId!)}>Ver compromiso asociado</Button>}
       </DialogContent>
     </Dialog>
   )

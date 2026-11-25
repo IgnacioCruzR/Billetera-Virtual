@@ -21,6 +21,7 @@ function MovementForm({ records, record, preset, busy, onSave, onCancel }: {
   const [errors, setErrors] = useState<ReturnType<typeof validateMovement>>({})
   const [saveError, setSaveError] = useState('')
   const isTransfer = type === 'transferencia'
+  const linked = Boolean(record?.commitmentId)
   const categoryOptions = type === 'ingreso' ? incomeCategories : expenseCategories
   const defaultCategory = record && record.type !== 'transferencia' && record.type === type ? record.categoryId : ''
 
@@ -30,8 +31,8 @@ function MovementForm({ records, record, preset, busy, onSave, onCancel }: {
     setSaveError('')
     const data = new FormData(event.currentTarget)
     const read = (key: string) => String(data.get(key) ?? '')
-    const amount = /^\d+$/.test(read('amount')) ? Number(read('amount')) : NaN
-    const common = { accountId, amount, date: read('date'), description: read('description').trim() }
+    const amount = record?.commitmentId ? record.amount : /^\d+$/.test(read('amount')) ? Number(read('amount')) : NaN
+    const common = { accountId, amount, date: record?.commitmentId ? record.date : read('date'), description: read('description').trim() }
     const categoryId = read('category')
     const classification = microExpenseOptions.find(item => item.id === read('classification'))?.id ?? 'automatica'
     const draft: MovementDraft = type === 'transferencia' ? { ...common, type, destinationId }
@@ -59,7 +60,7 @@ function MovementForm({ records, record, preset, busy, onSave, onCancel }: {
           {movementTypes.map(item => {
             const Icon = movementIcons[item.id]
             return (
-              <Button key={item.id} variant="ghost" onClick={() => { setType(item.id); setErrors({}) }} aria-pressed={item.id === type}
+              <Button key={item.id} variant="ghost" disabled={linked && item.id !== type} onClick={() => { setType(item.id); setErrors({}) }} aria-pressed={item.id === type}
                 className={cn('h-9 gap-1.5 px-1 text-xs sm:text-sm', item.id === type && 'bg-primary/15 text-emerald-300 hover:bg-primary/20 hover:text-emerald-200')}>
                 <Icon className="hidden size-3.5 min-[430px]:block" aria-hidden="true" />{item.label}
               </Button>
@@ -67,15 +68,15 @@ function MovementForm({ records, record, preset, busy, onSave, onCancel }: {
           })}
         </div>
         <div className="grid gap-3 sm:grid-cols-2">
-          <Field label="Monto (CLP)" error={errors.amount}>{(id, attributes) => <Input id={id} name="amount" inputMode="numeric" maxLength={12} required placeholder="15000" defaultValue={record?.amount} {...attributes} />}</Field>
-          <Field label="Fecha" error={errors.date}>{(id, attributes) => <Input id={id} name="date" type="date" defaultValue={record?.date ?? today} max={today} required {...attributes} />}</Field>
+          <Field label="Monto (CLP)" error={errors.amount}>{(id, attributes) => <Input id={id} name="amount" inputMode="numeric" maxLength={12} readOnly={linked} required placeholder="15000" defaultValue={record?.amount ?? preset?.amount} {...attributes} />}</Field>
+          <Field label="Fecha" error={errors.date}>{(id, attributes) => <Input id={id} name="date" type="date" defaultValue={record?.date ?? today} max={today} readOnly={linked} required {...attributes} />}</Field>
           <Field label={type === 'ingreso' ? 'Cuenta de destino' : 'Cuenta de origen'} error={errors.account}>{(id, attributes) => (
-            <Select id={id} name="account" value={accountId} onChange={event => {
+            <Select id={id} name="account" value={accountId} disabled={linked} onChange={event => {
               setAccountId(event.target.value)
               if (destinationId === event.target.value) setDestinationId('')
             }} required {...attributes}>
               <option value="" disabled>Selecciona una cuenta</option>
-              {activeAccounts.map(item => <option key={item.id} value={item.id}>{item.name}</option>)}
+              {(linked ? records.accounts : activeAccounts).map(item => <option key={item.id} value={item.id}>{item.name}</option>)}
             </Select>
           )}</Field>
           {isTransfer ? (
@@ -94,7 +95,7 @@ function MovementForm({ records, record, preset, busy, onSave, onCancel }: {
             )}</Field>
           )}
         </div>
-        <Field label="Descripción (opcional)">{id => <Input id={id} name="description" placeholder="Ej. Compras del supermercado" maxLength={120} defaultValue={record?.description} />}</Field>
+        <Field label="Descripción (opcional)">{id => <Input id={id} name="description" placeholder="Ej. Compras del supermercado" maxLength={120} defaultValue={record?.description ?? preset?.description} />}</Field>
         {type === 'gasto' && (
           <Field label="Clasificación de gasto pequeño">{id => (
             <Select id={id} name="classification" defaultValue={record?.type === 'gasto' ? record.classification : 'automatica'}>
@@ -103,7 +104,9 @@ function MovementForm({ records, record, preset, busy, onSave, onCancel }: {
           )}</Field>
         )}
       </fieldset>
+      {linked && <p className="text-xs text-muted-foreground">Movimiento de un compromiso confirmado. Puedes revisar su categoría, descripción y clasificación.</p>}
       {saveError && <p role="alert" className="rounded-lg bg-danger/10 px-3 py-2 text-sm text-red-300">{saveError}</p>}
+      {[errors.amount, saveError].some(message => message?.toLowerCase().includes('reservad')) && <a className="inline-block text-sm font-semibold text-indigo-200 hover:underline" href={record ? '#metas' : `#metas?cuenta=${encodeURIComponent(accountId)}`} onClick={onCancel}>{record ? 'Revisar reservas' : 'Revisar reservas de la cuenta'}</a>}
       <div className="flex flex-wrap justify-end gap-2 border-t border-border pt-4">
         <Button variant="outline" onClick={onCancel} disabled={busy}>Cancelar</Button>
         <Button type="submit" disabled={busy}>{busy && <LoaderCircle aria-hidden="true" className="size-4 animate-spin" />}{busy ? 'Guardando…' : 'Guardar movimiento'}</Button>

@@ -66,3 +66,27 @@ El frontend calcula avisos de demostración a partir del estado actual. La propu
 | `finance.budget.exceeded.v1` | El consumo supera el límite. |
 
 La carga propuesta incluye `presupuestoId`, `categoriaId`, `periodo`, `moneda`, `limite`, `consumo` y, para el aviso correspondiente, `umbral`. Conserva el sobre común, la clave de partición por usuario y los montos como cadenas decimales en CLP. Queda por acordar la precedencia entre el umbral por presupuesto y la regla global, el comportamiento de los cruces saltados y la deduplicación por presupuesto, período, tipo de alerta y valor del umbral cuando aplique. El frontend consultará los avisos del usuario y actualizará su lectura a través del BFF GraphQL.
+
+## Avisos de cobros y pagos
+
+La demo deriva avisos del estado compartido. La arquitectura prevista usa Financiero en .NET, Kafka para transportar eventos, Notificaciones en Java y el BFF NestJS para consultar avisos y registrar su lectura mediante GraphQL.
+
+| Tipo | Estado del contrato | Condición y datos |
+| --- | --- | --- |
+| `finance.commitment.due.v1` | Evento ya definido | El pendiente entra en la ventana de vencimiento. El aviso usa la fecha local vigente y la referencia al compromiso. |
+| `finance.commitment.overdue.v1` | Extensión propuesta | Se observa un pendiente después de su vencimiento en la zona del usuario. Datos propuestos `tipoCompromiso`, `fechaVencimiento`, `fechaLocalObservada` y `versionAgregado`. |
+| `finance.commitment.confirmed.v1` | Extensión propuesta | Financiero completa la confirmación y el alta del movimiento en la misma transacción. Datos propuestos `tipoCompromiso`, `movimientoId`, `fechaEfectiva` y `versionAgregado`. |
+
+Quedan por acordar el productor de la observación temporal, su relación con la evaluación periódica, y la relación del evento de confirmación propuesto con `CompromisoConfirmado` del catálogo v1. Se propone deduplicar los vencimientos por usuario, compromiso, condición y fecha vigente y la confirmación por compromiso y movimiento. Notificaciones debe consultar el estado vigente si el evento es anterior a una reprogramación o cancelación. El riesgo de saldo insuficiente se deriva de la proyección autorizada. Queda por definir si se ofrece como aviso persistente y cómo se identifica una misma condición de riesgo.
+
+## Avisos de metas de ahorro
+
+La bandeja de la demo calcula avisos desde las metas y operaciones compartidas. La arquitectura prevista usa Financiero en .NET para producir hechos, Kafka para su entrega y Notificaciones en Java para evaluar reglas y exponer avisos al BFF GraphQL.
+
+| Tipo | Estado del contrato | Condición y datos |
+| --- | --- | --- |
+| `finance.savings.goal_reached.v1` | Evento previamente definido | La reserva vigente alcanza el objetivo de la meta. |
+| `finance.savings.milestone_reached.v1` | Extensión propuesta | El progreso cruza un hito configurable. Datos propuestos `hitoPorcentaje`, `fechaLocal` y `versionAgregado`. La demo muestra el último hito vigente entre 25, 50 y 75 %. |
+| `finance.savings.goal_due.v1` | Extensión propuesta | La fecha objetivo de una meta abierta está próxima o vencida. Datos propuestos `fechaObjetivo`, `fechaLocalObservada`, `condicion` y `versionAgregado`. La demo considera próximos los siete días anteriores, incluido el día objetivo, y atrasado desde el día posterior. |
+
+Quedan por acordar los hitos configurables, la política de reemisión al liberar y volver a alcanzar un objetivo, la ventana de aviso y la evaluación de cambios de fecha. Se propone deduplicar por usuario, meta y hito, y por usuario, meta, fecha objetivo y condición temporal. Notificaciones debe reconsultar el estado vigente cuando la meta cambie antes de aplicar el aviso. Los escenarios hipotéticos se mantienen en el cliente en la demo.

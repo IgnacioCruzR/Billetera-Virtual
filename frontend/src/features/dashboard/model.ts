@@ -1,23 +1,13 @@
 import type { Budget } from '@/features/budgets/budget-model'
+import type { FinancialCommitment } from '@/features/commitments/commitment-model'
+import type { MicroExpenseClassification } from '@/features/micro-expenses/micro-expense-model'
+import type { SavingsGoal, SavingsReservationOperation } from '@/features/savings/savings-model'
+export type { MicroExpenseClassification, MicroExpenseStatus } from '@/features/micro-expenses/micro-expense-model'
+export { classificationLabels as microExpenseLabels, classificationOptions as microExpenseOptions } from '@/features/micro-expenses/micro-expense-model'
 
 export type Period = 'month' | 'quarter' | 'year'
 export type ChartMode = 'balance' | 'cashflow' | 'savings'
 export type MovementType = 'gasto' | 'ingreso' | 'transferencia'
-export type MicroExpenseClassification = 'automatica' | 'necesario' | 'prescindible'
-export type MicroExpenseStatus = 'posible' | 'necesario' | 'prescindible' | 'sin-clasificacion'
-
-export const microExpenseOptions = [
-  { id: 'automatica', label: 'Automática' },
-  { id: 'necesario', label: 'Gasto pequeño necesario' },
-  { id: 'prescindible', label: 'Gasto pequeño prescindible' },
-] as const
-
-export const microExpenseLabels: Record<MicroExpenseStatus, string> = {
-  posible: 'Posible gasto hormiga',
-  necesario: 'Gasto pequeño necesario',
-  prescindible: 'Gasto pequeño prescindible',
-  'sin-clasificacion': 'Sin clasificación',
-}
 
 export const periods = [
   { id: 'month', label: 'Este mes' },
@@ -83,11 +73,14 @@ export interface FinancialRecords {
   accounts: Account[]
   movements: Movement[]
   budgets: Budget[]
+  commitments: FinancialCommitment[]
   adjustments: AccountAdjustment[]
+  savingsGoals: SavingsGoal[]
+  reservations: SavingsReservationOperation[]
   usedAccountIds: ReadonlySet<string>
 }
 
-export interface MovementPreset { type?: MovementType; accountId?: string }
+export interface MovementPreset { type?: MovementType; accountId?: string; amount?: number; description?: string }
 
 interface MovementFields {
   accountId: string
@@ -102,22 +95,7 @@ export type MovementDraft = Transfer
   | (MovementFields & { type: 'ingreso'; categoryId: string })
   | (MovementFields & { type: 'gasto'; categoryId: string; classification: MicroExpenseClassification })
 
-export type Movement = MovementDraft & { id: string }
-
-export interface MicroExpenseCriteria {
-  maximumAmount: number
-  minimumCount: number
-}
-
-export interface Commitment {
-  id: string
-  accountId: string
-  type: 'cobro' | 'pago'
-  description: string
-  date: string
-  amount: number
-  daysUntil: number
-}
+export type Movement = MovementDraft & { id: string; commitmentId?: string }
 
 export interface ChartPoint {
   date: string
