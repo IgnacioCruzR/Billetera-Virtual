@@ -1,0 +1,35 @@
+{
+    "version":  "workspace-v1.0.0",
+    "applications":  [
+                         {
+                             "path":  "frontend",
+                             "repository":  "https://github.com/Error4144/billetera-frontend.git",
+                             "commit":  "a3e7671479d8afe134eda2e13e6d12b02b4f0c3d"
+                         },
+                         {
+                             "path":  "bff-graphql",
+                             "repository":  "https://github.com/Error4144/billetera-bff-graphql.git",
+                             "commit":  "326e68b6953f11384851bddf288e8b5908e63a4f"
+                         },
+                         {
+                             "path":  "ms-usuarios",
+                             "repository":  "https://github.com/Error4144/billetera-ms-usuarios.git",
+                             "commit":  "64f5be552d93742c4d094a41ea8e3d3f444a9f4f"
+                         },
+                         {
+                             "path":  "ms-transacciones",
+                             "repository":  "https://github.com/Error4144/billetera-ms-transacciones.git",
+                             "commit":  "991ae3b6c5b753bf7149c945ada1efe65ec43732"
+                         },
+                         {
+                             "path":  "ms-notificaciones",
+                             "repository":  "https://github.com/Error4144/billetera-ms-notificaciones.git",
+                             "commit":  "7a8de88dc38d3ba8723a85037eb7689a677c964a"
+                         },
+                         {
+                             "path":  "ms-agente-mcp",
+                             "repository":  "https://github.com/Error4144/billetera-ms-agente-mcp.git",
+                             "commit":  "c2d54d13450167aa849b1046e95ecc78e1c9de14"
+                         }
+                     ]
+}

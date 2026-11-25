@@ -1,0 +1,149 @@
+name: billetera-local
+
+x-postgres: &postgres
+  image: postgres:17.12-bookworm
+  healthcheck:
+    test: [CMD-SHELL, 'pg_isready -h 127.0.0.1 -p 5432 -U "$$POSTGRES_USER" -d "$$POSTGRES_DB"']
+    interval: 5s
+    timeout: 4s
+    start_period: 15s
+    retries: 12
+
+x-backend-check: &backend-check
+  profiles: [backend-check]
+
+services:
+  postgres-usuarios:
+    <<: *postgres
+    environment:
+      POSTGRES_DB: billetera_usuarios
+      POSTGRES_USER: ${POSTGRES_USUARIOS_USER:?define POSTGRES_USUARIOS_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_USUARIOS_PASSWORD:?define POSTGRES_USUARIOS_PASSWORD}
+      POSTGRES_HOST_AUTH_METHOD: scram-sha-256
+    networks: [usuarios-db]
+    volumes:
+      - postgres-usuarios:/var/lib/postgresql/data
+
+  postgres-transacciones:
+    <<: *postgres
+    environment:
+      POSTGRES_DB: billetera_transacciones
+      POSTGRES_USER: ${POSTGRES_TRANSACCIONES_USER:?define POSTGRES_TRANSACCIONES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_TRANSACCIONES_PASSWORD:?define POSTGRES_TRANSACCIONES_PASSWORD}
+      POSTGRES_HOST_AUTH_METHOD: scram-sha-256
+    networks: [transacciones-db]
+    volumes:
+      - postgres-transacciones:/var/lib/postgresql/data
+
+  postgres-notificaciones:
+    <<: *postgres
+    environment:
+      POSTGRES_DB: billetera_notificaciones
+      POSTGRES_USER: ${POSTGRES_NOTIFICACIONES_USER:?define POSTGRES_NOTIFICACIONES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_NOTIFICACIONES_PASSWORD:?define POSTGRES_NOTIFICACIONES_PASSWORD}
+      POSTGRES_HOST_AUTH_METHOD: scram-sha-256
+    networks: [notificaciones-db]
+    volumes:
+      - postgres-notificaciones:/var/lib/postgresql/data
+
+  kafka:
+    image: apache/kafka:4.3.2
+    environment:
+      CLUSTER_ID: cLdM0nGvR8Ks7kPdj4sJrg
+      KAFKA_NODE_ID: '1'
+      KAFKA_PROCESS_ROLES: broker,controller
+      KAFKA_CONTROLLER_QUORUM_VOTERS: 1@kafka:9093
+      KAFKA_CONTROLLER_LISTENER_NAMES: CONTROLLER
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: PLAINTEXT:PLAINTEXT,CONTROLLER:PLAINTEXT
+      KAFKA_LISTENERS: PLAINTEXT://:9092,CONTROLLER://:9093
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka:9092
+      KAFKA_INTER_BROKER_LISTENER_NAME: PLAINTEXT
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: '1'
+      KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR: '1'
+      KAFKA_TRANSACTION_STATE_LOG_MIN_ISR: '1'
+      KAFKA_AUTO_CREATE_TOPICS_ENABLE: 'false'
+      KAFKA_LOG_DIRS: /var/lib/kafka/data
+      KAFKA_HEAP_OPTS: -Xms256m -Xmx512m
+    networks: [eventos]
+    volumes:
+      - kafka:/var/lib/kafka/data
+    healthcheck:
+      test: [CMD-SHELL, 'KAFKA_HEAP_OPTS="-Xms64m -Xmx128m" /opt/kafka/bin/kafka-topics.sh --bootstrap-server kafka:9092 --list']
+      interval: 10s
+      timeout: 8s
+      start_period: 30s
+      retries: 12
+
+  frontend:
+    profiles: [frontend]
+    build:
+      context: ./frontend
+      args:
+        VITE_DATA_MODE: ${VITE_DATA_MODE:-demo}
+    ports:
+      - '127.0.0.1:${FRONTEND_PORT:-8080}:8080'
+    networks: [web]
+    healthcheck:
+      test: [CMD, wget, -qO-, 'http://127.0.0.1:8080/healthz']
+      interval: 5s
+      timeout: 3s
+      retries: 12
+
+  # Los backends actuales validan su configuración y terminan.
+  bff-graphql:
+    <<: *backend-check
+    build: ./bff-graphql
+    env_file: ./bff-graphql/.env.example
+    networks: [grpc]
+
+  ms-usuarios:
+    <<: *backend-check
+    build: ./ms-usuarios
+    env_file: ./ms-usuarios/.env.example
+    environment:
+      POSTGRES_USER: ${POSTGRES_USUARIOS_USER:?define POSTGRES_USUARIOS_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_USUARIOS_PASSWORD:?define POSTGRES_USUARIOS_PASSWORD}
+    networks: [grpc, usuarios-db, eventos]
+
+  ms-transacciones:
+    <<: *backend-check
+    build: ./ms-transacciones
+    env_file: ./ms-transacciones/.env.example
+    environment:
+      POSTGRES_USER: ${POSTGRES_TRANSACCIONES_USER:?define POSTGRES_TRANSACCIONES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_TRANSACCIONES_PASSWORD:?define POSTGRES_TRANSACCIONES_PASSWORD}
+    networks: [grpc, transacciones-db, eventos]
+
+  ms-notificaciones:
+    <<: *backend-check
+    build: ./ms-notificaciones
+    env_file: ./ms-notificaciones/.env.example
+    environment:
+      POSTGRES_USER: ${POSTGRES_NOTIFICACIONES_USER:?define POSTGRES_NOTIFICACIONES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_NOTIFICACIONES_PASSWORD:?define POSTGRES_NOTIFICACIONES_PASSWORD}
+    networks: [grpc, notificaciones-db, eventos]
+
+  ms-agente-mcp:
+    <<: *backend-check
+    build: ./ms-agente-mcp
+    env_file: ./ms-agente-mcp/.env.example
+    networks: [grpc]
+
+networks:
+  grpc:
+    internal: true
+  usuarios-db:
+    internal: true
+  transacciones-db:
+    internal: true
+  notificaciones-db:
+    internal: true
+  eventos:
+    internal: true
+  web:
+
+volumes:
+  postgres-usuarios:
+  postgres-transacciones:
+  postgres-notificaciones:
+  kafka:
